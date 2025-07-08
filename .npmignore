@@ -1,0 +1,45 @@
+# Source files (only include built dist)
+src/
+tsconfig.json
+tsconfig.dev.json
+*.env*
+.env*
+.husky/
+
+# Development files
+.eslintrc.json
+.prettierrc.json
+.prettierignore
+.eslintignore
+scripts/
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# Dependencies
+node_modules/
+
+# Development artifacts
+*.log
+coverage/
+.nyc_output/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Internal documentation
+DEVELOPMENT.md
+INTERNAL.md
+docs/internal/
+scripts/
+.devcontainer/
+
+# Configuration files that might contain sensitive info
+config/
+configs/
+.local/
+.cache/

@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    /* --- Project Settings --- */
+    "target": "ES2020", // Use a modern ECMAScript target that supports recent Node.js versions.
+    "module": "commonjs", // The standard module system for Node.js.
+    "rootDir": "./src", // Specify 'src' as the root directory for our source files.
+    "outDir": "./dist", // **CRITICAL**: This tells TypeScript to compile JS files into a 'dist' directory.
+    "esModuleInterop": true, // Allows for better compatibility between CommonJS and ES modules.
+    "forceConsistentCasingInFileNames": true, // Enforces consistent file naming.
+
+    /* --- Strictness & Quality --- */
+    "strict": true, // Enables all strict type-checking options. Highly recommended.
+    "skipLibCheck": true // Skips type checking of declaration files from dependencies.
+  },
+  "include": ["src/**/*"], // Tells the compiler to only include files from the 'src' directory.
+  "exclude": ["node_modules", "dist"] // Exclude these directories from the compilation process.
+}
