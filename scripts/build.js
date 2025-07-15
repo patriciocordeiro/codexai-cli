@@ -17,16 +17,18 @@ if (!isWatch) {
   }
 }
 
-// Create the appropriate .env file for the build
-const envContent = isDev
-  ? `NODE_ENV=development
-LOG_LEVEL=debug
-CODEAI_WEB_URL=http://localhost:3000
-CODEAI_API_URL=http://localhost:5001`
-  : `NODE_ENV=production
-LOG_LEVEL=info`;
+// Copy the appropriate .env file for the build
+const sourceEnvFile = isDev ? '.env.development' : '.env.production';
+const targetEnvFile = '.env';
 
-fs.writeFileSync('.env', envContent);
+console.log(`Copying ${sourceEnvFile} to ${targetEnvFile}...`);
+try {
+  const envContent = fs.readFileSync(sourceEnvFile, 'utf8');
+  fs.writeFileSync(targetEnvFile, envContent);
+} catch (error) {
+  console.error(`Error copying env file: ${error.message}`);
+  process.exit(1);
+}
 
 // Run TypeScript compilation
 const tscCommand = isWatch

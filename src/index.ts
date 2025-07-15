@@ -54,11 +54,12 @@ async function compressProject(paths: string[]): Promise<Buffer> {
   }
 }
 
-async function uploadZippedFile(
+async function createProjectWithFiles(
   zipBuffer: Buffer,
   apiKey: string,
   projectName?: string,
-  taskType: string = 'REVIEW'
+  taskType: string = 'REVIEW',
+  language: string = 'en'
 ): Promise<{ resultsUrl: string; projectId: string }> {
   const uploadSpinner = ora(
     'Uploading project and starting analysis...'
@@ -72,6 +73,7 @@ async function uploadZippedFile(
         'Content-Type': 'application/zip',
         'X-Project-Name': projectName || '',
         'X-Task-Type': taskType.toUpperCase(),
+        'X-Language': language.toLowerCase(),
         'X-CLI-Version': '1.0.0',
         'User-Agent': 'CodeAI-CLI/1.0.0',
       },
@@ -94,48 +96,48 @@ async function uploadZippedFile(
   }
 }
 
-async function triggerAnalysis(
-  apiKey: string,
-  options: { task: string },
-  projectId: string
-) {
-  const triggerSpinner = ora(`Starting '${options.task}' analysis...`).start();
+// async function triggerAnalysis(
+//   apiKey: string,
+//   options: { task: string },
+//   projectId: string
+// ) {
+//   const triggerSpinner = ora(`Starting '${options.task}' analysis...`).start();
 
-  try {
-    // This is an HTTP Callable function that accepts JSON data
-    const triggerResponse = await axios.post(
-      `${API_BASE_URL}/triggerAnalysisFunction`,
-      // Note: Callable functions invoked via HTTP have a `/data` wrapper in the payload
-      {
-        data: {
-          projectId: projectId,
-          task: options.task.toUpperCase(),
-          parameters: {}, // Future: Add parameters from CLI options here
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json', // It's a JSON payload now
-        },
-      }
-    );
+//   try {
+//     // This is an HTTP Callable function that accepts JSON data
+//     const triggerResponse = await axios.post(
+//       `${API_BASE_URL}/triggerAnalysisForCliFunction`,
+//       // Note: Callable functions invoked via HTTP have a `/data` wrapper in the payload
+//       {
+//         data: {
+//           projectId: projectId,
+//           task: options.task.toUpperCase(),
+//           parameters: {}, // Future: Add parameters from CLI options here
+//         },
+//       },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${apiKey}`,
+//           'Content-Type': 'application/json', // It's a JSON payload now
+//         },
+//       }
+//     );
 
-    const result = triggerResponse.data.result;
+//     const result = triggerResponse.data;
 
-    triggerSpinner.succeed(
-      `\n📊 Analysis task '${options.task}' started successfully for project ID: ${projectId}`
-    );
+//     triggerSpinner.succeed(
+//       `\n📊 Analysis task '${options.task}' started successfully for project ID: ${projectId}`
+//     );
 
-    console.log('\n🔄 Waiting for analysis to complete...', result);
-    // Note: The response will contain a URL
-    return result as { resultsUrl: string; projectId: string };
-  } catch (error) {
-    triggerSpinner.fail('Failed to start analysis.');
-    console.error(JSON.stringify(error));
-    process.exit(1);
-  }
-}
+//     console.log('\n🔄 Waiting for analysis to complete...');
+//     // Note: The response will contain a URL
+//     return result as { resultsUrl: string; projectId: string };
+//   } catch (error) {
+//     triggerSpinner.fail('Failed to start analysis.');
+//     console.error(JSON.stringify(error));
+//     process.exit(1);
+//   }
+// }
 
 // --- Auth Commands ---
 program
@@ -170,6 +172,11 @@ program
     'Specify the analysis task (e.g., REVIEW, UNIT_TESTS)',
     'REVIEW'
   )
+  .option(
+    '-l, --language <lang>',
+    'Specify the preferred language for analysis results (e.g., en, es, fr, pt)',
+    'en'
+  )
   .action(async (paths, options) => {
     console.log('🚀 Starting CodeAI analysis...');
 
@@ -181,22 +188,20 @@ program
       const zipBuffer = await compressProject(paths);
 
       // 3. Upload and start analysis
-      const { projectId } = await uploadZippedFile(
+      const { projectId, resultsUrl } = await createProjectWithFiles(
         zipBuffer,
         apiKey,
         options.project,
-        options.task
+        options.task,
+        options.language
       );
 
-      // 4. Execute the analysis task
-      const result = await triggerAnalysis(apiKey, options, projectId);
-
-      // 5. Display results
+      // 4. Display results
       console.log(
         `\n✅ Analysis completed successfully for project ID: ${projectId}`
       );
-      console.log(`🔗 View results at: ${result.resultsUrl}`);
-      open(result.resultsUrl).catch(err => {
+      console.log(`🔗 View results at: ${resultsUrl}`);
+      open(resultsUrl).catch(err => {
         console.error(
           chalk.red.bold('Failed to open results URL in browser:', err)
         );
