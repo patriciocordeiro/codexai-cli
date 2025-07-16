@@ -1,9 +1,9 @@
 import {
+  API_BASE_URL,
+  IS_PRODUCTION,
   LOG_LEVEL,
   NODE_ENV,
-  IS_PRODUCTION,
   WEB_APP_URL,
-  API_BASE_URL,
 } from './constants';
 
 /**
@@ -48,7 +48,7 @@ export class Logger {
 /**
  * Environment configuration validator
  */
-export function validateEnvironment(): void {
+export async function validateEnvironment() {
   // No required environment variables for end users
   // URLs are hardcoded, other settings have defaults
 
@@ -60,8 +60,9 @@ export function validateEnvironment(): void {
 /**
  * Configuration summary for debugging
  */
-export function logConfiguration(): void {
-  if (!IS_PRODUCTION) {
+// export function logConfiguration(): void {
+export function logConfiguration(isProduction: boolean = IS_PRODUCTION): void {
+  if (!isProduction) {
     Logger.debug('Current configuration:');
     Logger.debug(`- NODE_ENV: ${NODE_ENV}`);
     Logger.debug(`- LOG_LEVEL: ${LOG_LEVEL}`);

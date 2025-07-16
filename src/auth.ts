@@ -6,7 +6,7 @@ import ora from 'ora';
 import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { API_BASE_URL, WEB_APP_URL, CLI_CONFIG_DIR } from './constants';
+import { API_BASE_URL, CLI_CONFIG_DIR, WEB_APP_URL } from './constants';
 
 const CONFIG_PATH = path.join(
   CLI_CONFIG_DIR.replace('~', os.homedir()),
@@ -39,7 +39,7 @@ export async function loadApiKey(): Promise<string | null> {
   try {
     if (await fse.pathExists(CONFIG_PATH)) {
       const config: Config = await fse.readJson(CONFIG_PATH);
-      return config.apiKey || null;
+      return config.apiKey;
     }
     return null;
   } catch (error) {

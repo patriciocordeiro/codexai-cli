@@ -10,7 +10,8 @@
 
     /* --- Strictness & Quality --- */
     "strict": true, // Enables all strict type-checking options. Highly recommended.
-    "skipLibCheck": true // Skips type checking of declaration files from dependencies.
+    "skipLibCheck": true, // Skips type checking of declaration files from dependencies.
+    "types": ["jest"] // Recognize Jest globals in test files.
   },
   "include": ["src/**/*"], // Tells the compiler to only include files from the 'src' directory.
   "exclude": ["node_modules", "dist"] // Exclude these directories from the compilation process.

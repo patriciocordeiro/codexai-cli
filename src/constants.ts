@@ -15,14 +15,13 @@ export const HTTP_TIMEOUT = parseInt(process.env.HTTP_TIMEOUT || '30000', 10);
 export const MAX_RETRIES = parseInt(process.env.MAX_RETRIES || '3', 10);
 
 // Development mode check
-export const IS_DEVELOPMENT = NODE_ENV === 'development';
 export const IS_PRODUCTION = NODE_ENV === 'production';
 
 // --- URL Configuration (from environment variables) ---
 export const WEB_APP_URL = process.env.CODEAI_WEB_URL;
 export const API_BASE_URL = process.env.CODEAI_API_URL;
 
-if (!WEB_APP_URL || !API_BASE_URL) {
+if ((!WEB_APP_URL || !API_BASE_URL) && process.env.NODE_ENV === 'production') {
   throw new Error(
     'Environment variables CODEAI_WEB_URL and CODEAI_API_URL must be set. Please check your .env file or check the .env.example file in the project root to see the required variables.'
   );
