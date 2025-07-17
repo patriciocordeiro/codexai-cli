@@ -25,8 +25,10 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Use variables
+        run: |
+          echo "CODEAI_API_URL variable : $CODEAI_API_URL"
+          echo "CODEAI_WEB_URL variable : $CODEAI_WEB_URL"
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
