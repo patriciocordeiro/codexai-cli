@@ -1,6 +1,6 @@
 # CodeAI CLI
 
-A CLI tool to upload and analyze code projects using CodeAI.
+A CLI tool for AI-powered code analysis and automated code review using AI.
 
 **Version:** 1.0.0
 

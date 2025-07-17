@@ -1,7 +1,7 @@
 {
   "name": "@codexai/cli",
   "version": "1.0.0",
-  "description": "A CLI tool to upload and analyze code projects using CodeAI",
+  "description": "A CLI tool for AI-powered code analysis and automated code review using AI.",
   "main": "dist/index.js",
   "files": [
     "dist/**/*",

@@ -28,7 +28,9 @@ const cliProgram = new Command();
 
 cliProgram
   .name('codeai')
-  .description('A CLI tool to upload and analyze code projects.')
+  .description(
+    'A CLI tool for AI-powered code analysis and automated code review using AI'
+  )
   .version('0.0.1');
 
 // --- Auth Commands ---
