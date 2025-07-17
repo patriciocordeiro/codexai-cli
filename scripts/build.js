@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const path = require('path');
 const { execSync } = require('child_process');
-
+require('dotenv').config();
 const isDev = process.argv.includes('--dev');
 const isWatch = process.argv.includes('--watch');
 
@@ -17,17 +16,27 @@ if (!isWatch) {
   }
 }
 
-// Copy the appropriate .env file for the build
-const sourceEnvFile = isDev ? '.env.development' : '.env.production';
+console.log(
+  'process.env.CODEAI_WEB_URL:',
+  process.env.NODE_ENV,
+  process.env.CODEAI_WEB_URL
+);
+
+// check if the source env file exists
+const sourceEnvFile = isDev ? '.env.development' : '.env.production' || '.env';
 const targetEnvFile = '.env';
 
-console.log(`Copying ${sourceEnvFile} to ${targetEnvFile}...`);
-try {
-  const envContent = fs.readFileSync(sourceEnvFile, 'utf8');
-  fs.writeFileSync(targetEnvFile, envContent);
-} catch (error) {
-  console.error(`Error copying env file: ${error.message}`);
-  process.exit(1);
+if (fs.existsSync(sourceEnvFile)) {
+  console.error(`Source env file ${sourceEnvFile} does not exist.`);
+
+  try {
+    console.log(`Copying ${sourceEnvFile} to ${targetEnvFile}...`);
+    const envContent = fs.readFileSync(sourceEnvFile, 'utf8');
+    fs.writeFileSync(targetEnvFile, envContent);
+  } catch (error) {
+    console.error(`Error copying env file: ${error.message}`);
+    process.exit(1);
+  }
 }
 
 // Run TypeScript compilation

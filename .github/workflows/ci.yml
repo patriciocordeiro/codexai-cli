@@ -9,7 +9,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
+    env:
+      MY_API_KEY: ${{ secrets.MY_API_KEY }}
+      API_URL: ${{ vars.API_URL }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+      CODEAI_WEB_URL: ${{ vars.CODEAI_WEB_URL }}
+      CODEAI_API_URL: ${{ vars.CODEAI_API_URL }}
+      CLI_CONFIG_DIR: ${{ vars.CLI_CONFIG_DIR }}
+      CLI_TIMEOUT: ${{ vars.CLI_TIMEOUT }}
+      HTTP_TIMEOUT: ${{ vars.HTTP_TIMEOUT }}
+      MAX_RETRIES: ${{ vars.MAX_RETRIES }}
     strategy:
       matrix:
         node-version: [18.x, 20.x]
