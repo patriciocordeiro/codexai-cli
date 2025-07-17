@@ -25,16 +25,16 @@ jobs:
         node-version: [18.x, 20.x]
 
     steps:
-      - name: Use variables
-        run: |
-          echo "CODEAI_API_URL variable : $CODEAI_API_URL"
-          echo "CODEAI_WEB_URL variable : $CODEAI_WEB_URL"
-
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+
+      - name: Use variables
+        run: |
+          echo "CODEAI_API_URL variable : $CODEAI_API_URL"
+          echo "CODEAI_WEB_URL variable : $CODEAI_WEB_URL"
 
       - name: Install dependencies
         run: npm ci
