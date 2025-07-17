@@ -3,5 +3,5 @@ npx lint-staged
 
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|js)$' | tr '\n' ' ')
 if [ -n "$STAGED_FILES" ]; then
-  npx jest --bail --findRelatedTests $STAGED_FILES
+  npx jest --bail --passWithNoTests --findRelatedTests $STAGED_FILES
 fi
