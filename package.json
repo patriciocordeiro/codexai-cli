@@ -47,10 +47,12 @@
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "type-check": "tsc --noEmit",
-    "check": "npm run type-check && npm run lint",
+    "check": "npm run type-check && npm run lint && npm run format:check && npm test",
     "prepublishOnly": "npm run check && npm run build",
     "prepare": "husky || true",
-    "commitlint": "commitlint --edit"
+    "publish": "npm publish",
+    "commitlint": "commitlint --edit",
+    "patch-version": "npm version patch"
   },
   "dependencies": {
     "archiver": "^7.0.1",
