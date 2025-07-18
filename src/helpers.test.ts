@@ -148,7 +148,7 @@ describe('Helpers', () => {
       const axiosError = {
         response: {
           status: 400,
-          data: { error: 'Bad request' },
+          data: 'Bad request',
         },
       };
       mockAxiosPost.mockRejectedValue(axiosError);

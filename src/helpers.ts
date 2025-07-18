@@ -62,9 +62,16 @@ export async function createProjectWithFiles(
     uploadSpinner.fail('Failed to start analysis.');
     const axiosError = error as AxiosError;
     if (axiosError.response) {
-      const errorMessage = (axiosError.response.data as { error: string })
-        ?.error;
+      const errorMessage = axiosError.response.data;
       console.error(`❌ Error ${axiosError.response.status}: ${errorMessage}`);
+      if (
+        axiosError.response.status === 401 ||
+        axiosError.response.status === 403
+      ) {
+        console.error(
+          '❌ Unauthorized: Please check your API key or logout and login again.'
+        );
+      }
     } else {
       console.error('An unexpected error occurred:', axiosError.message);
     }
