@@ -1,13 +1,19 @@
 import axios from 'axios';
-import chalk from 'chalk'; // <-- Import `chalk`
+import chalk from 'chalk';
 import * as fse from 'fs-extra';
-import open from 'open';
 import ora from 'ora';
 import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { API_BASE_URL, CLI_CONFIG_DIR, WEB_APP_URL } from './constants';
+import { openBrowser } from './helpers';
 
+if (!CLI_CONFIG_DIR || !API_BASE_URL || !WEB_APP_URL) {
+  console.error(
+    chalk.red('Error: One or more required environment variables are not set.')
+  );
+  process.exit(1);
+}
 const CONFIG_PATH = path.join(
   CLI_CONFIG_DIR.replace('~', os.homedir()),
   'config.json'
@@ -17,11 +23,7 @@ interface Config {
   apiKey: string;
 }
 
-/**
- * Saves the API key to a local config file.
- */
 export async function saveApiKey(apiKey: string): Promise<void> {
-  // ... (implementation is correct, no changes needed)
   try {
     await fse.ensureDir(path.dirname(CONFIG_PATH));
     await fse.writeJson(CONFIG_PATH, { apiKey });
@@ -52,7 +54,6 @@ export async function loadApiKey(): Promise<string | null> {
  * Removes the local config file.
  */
 async function removeApiKey(): Promise<void> {
-  // This is an internal helper
   try {
     if (await fse.pathExists(CONFIG_PATH)) {
       await fse.remove(CONFIG_PATH);
@@ -86,12 +87,11 @@ export async function webLogin(): Promise<void> {
 
   // --- Automatically open the browser ---
   try {
-    open(loginUrl);
-  } catch (error) {
+    await openBrowser(loginUrl);
+  } catch {
     console.warn(
       chalk.yellow(
-        'Warning: Could not automatically open the browser. Please copy the link above.',
-        error
+        'Warning: Could not automatically open the browser. Please copy the link above.'
       )
     );
   }
@@ -129,6 +129,5 @@ export async function webLogin(): Promise<void> {
  * Logs the user out by deleting their stored API key.
  */
 export async function logout(): Promise<void> {
-  // <-- ADDED THIS EXPORTED FUNCTION
   await removeApiKey();
 }

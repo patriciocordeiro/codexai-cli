@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import axios from 'axios';
 import chalk from 'chalk';
 import * as fse from 'fs-extra';
-import open from 'open';
 import ora from 'ora';
 import { loadApiKey, logout, saveApiKey, webLogin } from './auth';
+import * as helpers from './helpers';
+import { openBrowser } from './helpers';
 
 jest.mock('path', () => ({
   join: (...args: string[]) => args.join('/'),
@@ -18,7 +19,6 @@ jest.mock('os', () => ({
 
 jest.mock('fs-extra');
 jest.mock('axios');
-jest.mock('open', () => jest.fn());
 jest.mock('ora', () => {
   const oraMock = jest.fn(() => ({
     start: jest.fn().mockReturnThis(),
@@ -34,6 +34,21 @@ jest.mock('chalk', () => ({
   green: (s: string) => s,
   red: (s: string) => s,
   yellow: (s: string) => s,
+}));
+
+jest.mock('./helpers', () => ({
+  openBrowser: jest.fn(),
+  executeCommand: jest.fn(),
+}));
+
+jest.mock('./constants', () => ({
+  API_BASE_URL: 'https://api.test.com',
+  WEB_APP_URL: 'https://web.test.com',
+  CLI_CONFIG_DIR: '/mock/.codeai',
+  CLI_TIMEOUT: 120000,
+  HTTP_TIMEOUT: 30000,
+  MAX_RETRIES: 3,
+  IS_DEVELOPMENT: false,
 }));
 
 describe('auth', () => {
@@ -136,15 +151,22 @@ describe('auth', () => {
         throw new Error('Invalid URL');
       });
 
+      // Spy on openBrowser so it can be asserted
+      const openBrowserSpy = jest
+        .spyOn(helpers, 'openBrowser')
+        .mockResolvedValue(undefined);
+
       await webLogin();
 
-      expect(open).toHaveBeenCalledWith(
+      expect(openBrowserSpy).toHaveBeenCalledWith(
         expect.stringContaining('/cli-login?session=')
       );
       expect(spinnerMock.start).toHaveBeenCalled();
       expect(spinnerMock.succeed).toHaveBeenCalledWith(
         chalk.green('✅ Successfully logged in!')
       );
+
+      openBrowserSpy.mockRestore();
       expect(fse.writeJson).toHaveBeenCalledWith(CONFIG_PATH, {
         apiKey: 'mock-api-key',
       });
@@ -186,14 +208,14 @@ describe('auth', () => {
       };
       (ora as jest.Mock).mockReturnValue(spinnerMock);
 
-      // Make open throw
-      (open as jest.Mock).mockImplementation(() => {
-        throw new Error('browser error');
-      });
-
       const consoleWarnSpy = jest
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
+
+      // Make open throw
+      (openBrowser as jest.Mock).mockImplementation(() => {
+        throw new Error('browser error');
+      });
 
       // Patch axios.post to immediately resolve with no apiKey to avoid polling loop
       (axios.post as jest.Mock).mockResolvedValue({
@@ -217,9 +239,8 @@ describe('auth', () => {
       await expect(webLogin()).rejects.toThrow('Login timed out.');
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        chalk.yellow(
-          'Warning: Could not automatically open the browser. Please copy the link above.',
-          expect.any(Error)
+        expect.stringContaining(
+          'Warning: Could not automatically open the browser. Please copy the link above.'
         )
       );
 
@@ -253,6 +274,46 @@ describe('auth', () => {
       );
 
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('environment variable validation', () => {
+    it('should exit if required environment variables are missing', async () => {
+      // Remove required env vars
+      jest.clearAllMocks();
+      jest.resetModules();
+      jest.mock('./constants', () => ({
+        API_BASE_URL: null,
+        WEB_APP_URL: undefined,
+        CLI_CONFIG_DIR: undefined, // Simulate missing
+      }));
+
+      console.log('CLI_CONFIG_DIR', process.env.CLI_CONFIG_DIR);
+      const mockConsoleError = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      // Import the module that triggers the env check
+      let thrownError: Error | null = null;
+      try {
+        await import('./auth');
+      } catch (err) {
+        thrownError = err as Error;
+      }
+      expect(thrownError).toBeTruthy();
+      expect(thrownError?.message).toBe('process.exit called');
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Error: One or more required environment variables are not set.'
+        )
+      );
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockConsoleError.mockRestore();
+      mockExit.mockRestore();
     });
   });
 });

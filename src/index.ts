@@ -1,9 +1,6 @@
-#!/usr/bin/env node
-
 import axios from 'axios';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import open from 'open';
 import { logout, webLogin } from './auth';
 import { logConfiguration, validateEnvironment } from './config';
 import { HTTP_TIMEOUT, IS_PRODUCTION } from './constants';
@@ -11,6 +8,7 @@ import {
   checkAuthentication,
   compressProject,
   createProjectWithFiles,
+  openBrowser,
 } from './helpers';
 
 // Validate environment before starting
@@ -81,7 +79,7 @@ cliProgram
       const zipBuffer = await compressProject(paths);
 
       // 3. Upload and start analysis
-      const { projectId, resultsUrl } = await createProjectWithFiles(
+      const { resultsUrl } = await createProjectWithFiles(
         zipBuffer,
         apiKey,
         options.project,
@@ -90,11 +88,10 @@ cliProgram
       );
 
       // 4. Display results
-      console.log(
-        `\n✅ Analysis completed successfully for project ID: ${projectId}`
-      );
-      console.log(`🔗 View results at: ${resultsUrl}`);
-      open(resultsUrl).catch(err => {
+      console.log(`\n✅ Analysis started successfully`);
+      console.log(chalk.blue(`🔗 View results at: ${resultsUrl}`));
+
+      openBrowser(resultsUrl).catch(err => {
         console.error(
           chalk.red.bold('Failed to open results URL in browser:', err)
         );

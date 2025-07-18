@@ -1,5 +1,8 @@
 import axios, { AxiosError } from 'axios';
+import chalk from 'chalk';
+import { exec } from 'child_process';
 import ora from 'ora';
+import * as os from 'os';
 import { createZipFromPaths } from './archive';
 import { loadApiKey } from './auth';
 import { API_BASE_URL } from './constants';
@@ -41,7 +44,6 @@ export async function createProjectWithFiles(
   ).start();
   try {
     const endpointUrl = `${API_BASE_URL}/createProjectWithFilesFunction`;
-    console.log('API_BASE_URL', API_BASE_URL);
     const response = await axios.post(endpointUrl, zipBuffer, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -68,4 +70,37 @@ export async function createProjectWithFiles(
     }
     process.exit(1);
   }
+}
+
+export async function openBrowser(url: string): Promise<void> {
+  if (url.length) {
+    if (os.platform() === 'darwin') {
+      // macOS
+      await executeCommand(`open ${url}`);
+    } else if (os.platform() === 'win32') {
+      // Windows
+      await executeCommand(`start ${url}`);
+    } else {
+      await executeCommand(`xdg-open ${url}`);
+    }
+  } else {
+    console.warn(
+      'Warning: No results URL provided. Please copy the link above.'
+    );
+  }
+}
+
+// Helper function to execute commands and handle errors
+export async function executeCommand(command: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(chalk.red(`Error executing command: ${command}`));
+        console.error(chalk.red(`stderr: ${stderr}`));
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
 }

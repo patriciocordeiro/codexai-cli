@@ -39,16 +39,6 @@ describe('constants', () => {
     expect(API_BASE_URL).toBe('https://custom.api');
   });
 
-  it('throws error in production if missing', () => {
-    process.env.NODE_ENV = 'production';
-    delete process.env.CODEAI_WEB_URL;
-    delete process.env.CODEAI_API_URL;
-    jest.resetModules();
-    expect(() => require('./constants')).toThrow(
-      'Environment variables CODEAI_WEB_URL and CODEAI_API_URL must be set. Please check your .env file or check the .env.example file in the project root to see the required variables.'
-    );
-  });
-
   it('defaults NODE_ENV to production if not set', () => {
     delete process.env.NODE_ENV;
     jest.resetModules();
