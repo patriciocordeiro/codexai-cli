@@ -38,6 +38,9 @@ const defineEnv = {
     process.env.HTTP_TIMEOUT || '30000'
   ),
   'process.env.MAX_RETRIES': JSON.stringify(process.env.MAX_RETRIES || '3'),
+  'process.env.CLI_CONFIG_DIR': JSON.stringify(
+    process.env.CLI_CONFIG_DIR || ''
+  ), // Provide fallback empty string
 };
 
 async function build() {

@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import chalk from 'chalk';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import ora from 'ora';
 import * as os from 'os';
 import { createZipFromPaths } from './archive';
@@ -110,4 +110,95 @@ export async function executeCommand(command: string): Promise<void> {
       }
     });
   });
+}
+
+/**
+ * Filter and sanitize input file paths for compression.
+ * Removes excluded folders/files and unsupported file types.
+ */
+function collectFilesToCompress(inputPaths: string[]): string[] {
+  const path = require('path');
+  const fs = require('fs');
+  const files: string[] = [];
+
+  function walk(p: string) {
+    const absPath = path.resolve(p);
+    if (isExcludedPath(absPath)) return;
+    if (!fs.existsSync(absPath)) return;
+    const stat = fs.statSync(absPath);
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(absPath)) {
+        walk(path.join(absPath, entry));
+      }
+    } else if (isSupportedCodeFile(absPath)) {
+      files.push(absPath);
+    }
+  }
+
+  for (const p of inputPaths) {
+    walk(p);
+  }
+  // Remove duplicates
+  return Array.from(new Set(files));
+}
+
+/**
+ * Returns an array of changed files in the current git repository.
+ * @param options Options for filtering (e.g., staged, unstaged, etc.)
+ */
+export function getChangedFiles(options: { staged?: boolean } = {}): string[] {
+  let cmd = 'git diff --name-only';
+  if (options.staged) {
+    cmd = 'git diff --cached --name-only';
+  }
+  try {
+    const output = execSync(cmd, { encoding: 'utf-8' });
+    return output.split('\n').filter(f => f.trim().length > 0);
+  } catch (err) {
+    console.error('Failed to get changed files from git:', err);
+    return [];
+  }
+}
+
+export function getFilesToCompress(paths: string[], options: any) {
+  let filesToCompress: string[];
+  if (options.changed) {
+    const changedFiles = getChangedFiles({ staged: false });
+    filesToCompress = collectFilesToCompress(changedFiles);
+    if (filesToCompress.length === 0) {
+      console.error(chalk.red('No valid changed files found in git.'));
+      process.exit(1);
+    }
+    console.log(
+      chalk.yellow(
+        `Analyzing only changed files:\n${filesToCompress.join('\n')}`
+      )
+    );
+  } else {
+    filesToCompress = collectFilesToCompress(paths);
+    if (filesToCompress.length === 0) {
+      console.error(chalk.red('No valid files found in provided paths.'));
+      process.exit(1);
+    }
+  }
+
+  return filesToCompress;
+}
+
+/**
+ * Returns true if the file is a supported code file.
+ */
+export function isSupportedCodeFile(filePath: string): boolean {
+  return /\.(js|jsx|ts|tsx|json|md|txt|cjs|mjs|css|scss|html|yml|yaml|xml|csv|py|java|go|rb|php|sh|bat|dockerfile|env|tsconfig|eslintrc|prettierrc|gitignore|lock|toml|ini|pl|swift|rs|cpp|h|hpp|c|cs|vb|fs|kt|dart|scala|sql|r|jl|ipynb|sln|props|targets|gradle|makefile|mk|cmake|asm|vue|svelte|astro|tsx|jsx)$/.test(
+    filePath
+  );
+}
+
+/**
+ * Returns true if the path should be excluded (e.g., node_modules, .git, dist, etc.)
+ */
+export function isExcludedPath(filePath: string): boolean {
+  return /(^|\/)(node_modules|\.git|dist|build|coverage|out|.next|.cache|tmp|temp|\.vscode|\.idea|\.husky|\.DS_Store|\.env.*|\.yarn|\.pnpm|\.parcel-cache|\.turbo|\.vercel|\.firebase|\.sentry|\.nyc_output|\.storybook|README\.md|package\.json|package-lock\.json|tsconfig\.json|tsconfig\..*|commitlint\.config\.json|\.[^/]+)(\/|$)/i.test(
+    filePath
+  );
 }

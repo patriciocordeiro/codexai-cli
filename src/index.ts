@@ -1,6 +1,5 @@
 import axios from 'axios';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
 import { Command } from 'commander';
 import { logout, webLogin } from './auth';
 import { logConfiguration, validateEnvironment } from './config';
@@ -9,6 +8,7 @@ import {
   checkAuthentication,
   compressProject,
   createProjectWithFiles,
+  getFilesToCompress,
   openBrowser,
 } from './helpers';
 
@@ -81,21 +81,9 @@ cliProgram
       const apiKey = await checkAuthentication();
 
       // 2. Determine files to compress
-      let filesToCompress: string[];
-      if (options.changed) {
-        filesToCompress = getChangedFiles({ staged: false });
-        if (filesToCompress.length === 0) {
-          console.error(chalk.red('No changed files found in git.'));
-          process.exit(1);
-        }
-        console.log(
-          chalk.yellow(
-            `Analyzing only changed files:\n${filesToCompress.join('\n')}`
-          )
-        );
-      } else {
-        filesToCompress = paths;
-      }
+      const filesToCompress = getFilesToCompress(paths, options);
+
+      console.log(`📂 Files to analyze: ${filesToCompress.length}`);
 
       // 3. Compress the project files
       const zipBuffer = await compressProject(filesToCompress);
@@ -125,24 +113,6 @@ cliProgram
       process.exit(1);
     }
   });
-
-/**
- * Returns an array of changed files in the current git repository.
- * @param options Options for filtering (e.g., staged, unstaged, etc.)
- */
-export function getChangedFiles(options: { staged?: boolean } = {}): string[] {
-  let cmd = 'git diff --name-only';
-  if (options.staged) {
-    cmd = 'git diff --cached --name-only';
-  }
-  try {
-    const output = execSync(cmd, { encoding: 'utf-8' });
-    return output.split('\n').filter(f => f.trim().length > 0);
-  } catch (err) {
-    console.error('Failed to get changed files from git:', err);
-    return [];
-  }
-}
 
 // Only run the CLI if this file is being executed directly, not when imported for testing
 if (require.main === module) {
