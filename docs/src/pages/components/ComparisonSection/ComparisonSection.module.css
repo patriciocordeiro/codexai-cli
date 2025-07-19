@@ -1,0 +1,133 @@
+.comparisonSection {
+  background-color: var(
+    --dark-purple
+  ); /* Back to the base dark for a serious, focused feel */
+  position: relative;
+  overflow: hidden;
+}
+
+.comparisonSection::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -20%;
+  width: 50%;
+  height: 100%;
+  background: radial-gradient(
+    circle,
+    var(--nebula-glow-cyan) 0%,
+    transparent 70%
+  );
+  filter: blur(150px);
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.comparisonSection::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  right: -20%;
+  width: 50%;
+  height: 100%;
+  background: radial-gradient(
+    circle,
+    var(--nebula-glow-magenta) 0%,
+    transparent 70%
+  );
+  filter: blur(150px);
+  opacity: 0.3;
+  z-index: 0;
+}
+
+.comparisonSection .container {
+  position: relative;
+  z-index: 1;
+}
+
+.sectionTitle {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.table {
+  max-width: 960px;
+  margin: 0 auto;
+  background: var(--light-purple);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.header,
+.row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  align-items: center;
+  text-align: center;
+}
+
+.header {
+  padding: 1rem 1.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  background-color: rgba(13, 12, 29, 0.5); /* Even darker header */
+}
+
+.highlightedHeader {
+  color: var(--neon-cyan);
+}
+
+.row {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 1rem;
+}
+
+.featureName {
+  font-weight: bold;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.column {
+  color: var(--text-secondary);
+}
+
+.highlightedColumn {
+  color: var(--text-primary);
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .header {
+    display: none;
+  }
+  .row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.5rem;
+    text-align: left;
+  }
+  .featureName {
+    margin-bottom: 1rem;
+  }
+  .column::before {
+    display: block;
+    font-size: 0.8rem;
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+  }
+  .column:nth-of-type(1)::before {
+    content: 'TRADITIONAL TOOLS';
+  }
+  .column:nth-of-type(2)::before {
+    content: 'THE CODEAI WAY';
+    color: var(--neon-cyan);
+  }
+}

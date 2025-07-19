@@ -1,0 +1,30 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.installCommand {
+  background-color: #282a36; /* Dracula theme background */
+  color: #f8f8f2; /* Dracula theme foreground */
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-family: 'Fira Code', 'Dank Mono', monospace;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  border: 1px solid #44475a; /* Dracula theme selection */
+}

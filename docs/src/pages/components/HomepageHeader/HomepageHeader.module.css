@@ -1,0 +1,82 @@
+.heroBanner {
+  position: relative;
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 0;
+  overflow: hidden;
+}
+.heroBgGradient {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1500px;
+  height: 1500px;
+  background: radial-gradient(
+    circle,
+    var(--dark-nebula-magenta),
+    var(--dark-nebula-cyan)
+  );
+
+  transform: translate(-50%, -50%);
+  filter: blur(200px);
+  animation: pulse 20s infinite ease-in-out;
+  /* opacity: 0.1; */
+  z-index: -1;
+}
+@keyframes pulse {
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+}
+.heroTitle {
+  font-size: 5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+.heroSubtitle {
+  font-size: 1.5rem;
+  max-width: 700px;
+  margin: 0 auto 3rem auto;
+}
+.installCommand {
+  background: var(--light-purple);
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--neon-magenta);
+  box-shadow: 0 0 20px rgba(255, 0, 193, 0.4);
+  margin-bottom: 2rem;
+}
+.promptSymbol {
+  color: var(--neon-green);
+}
+.ctaButton {
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 2.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+}
+.ctaButton:hover {
+  transform: translateY(-5px);
+  box-shadow:
+    0 10px 30px rgba(0, 246, 255, 0.3),
+    0 5px 20px rgba(255, 0, 193, 0.3);
+}
+@media (max-width: 768px) {
+  .heroTitle {
+    font-size: 3rem;
+  }
+  .heroSubtitle {
+    font-size: 1.2rem;
+  }
+}

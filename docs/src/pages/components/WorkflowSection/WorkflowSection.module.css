@@ -1,0 +1,120 @@
+.workflowSection {
+  background-color: var(--dark-purple);
+  border-bottom: none;
+}
+
+.sectionTitle {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 5rem;
+}
+
+.stepsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6rem;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto;
+  align-items: center;
+  gap: 4rem;
+}
+
+/* THE NEW CARD STYLE */
+.card {
+  background: var(--light-purple);
+  padding: 2.5rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+}
+
+.iconContainer {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  /* Icon now has no background, it "floats" */
+}
+
+.textContainer h3 {
+  font-size: 2.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--neon-cyan);
+}
+
+.textContainer p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-width: 50ch; /* Limits line length for readability */
+}
+
+.textContainer p code {
+  background-color: rgba(13, 12, 29, 0.8); /* A darker background for code */
+  color: var(--neon-green);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* REVERSE LAYOUT LOGIC */
+.reversed {
+  /* Swap the column order */
+  grid-template-columns: auto minmax(300px, 1fr);
+}
+
+.reversed .card {
+  order: 2;
+}
+
+.reversed .iconContainer {
+  order: 1;
+}
+
+.reversed .textContainer h3 {
+  color: var(--neon-magenta);
+}
+
+/* RESPONSIVE ADJUSTMENTS */
+@media (max-width: 996px) {
+  .step,
+  .reversed {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .card,
+  .reversed .card {
+    order: 2;
+    padding: 1.5rem;
+  }
+
+  .iconContainer,
+  .reversed .iconContainer {
+    order: 1;
+    width: 150px;
+    height: 150px;
+  }
+
+  .textContainer {
+    text-align: center;
+  }
+
+  .textContainer p {
+    max-width: none; /* Remove line length limit on mobile */
+  }
+
+  .sectionTitle {
+    font-size: 2.5rem;
+    margin-bottom: 4rem;
+  }
+
+  .textContainer h3 {
+    font-size: 2rem;
+  }
+}
