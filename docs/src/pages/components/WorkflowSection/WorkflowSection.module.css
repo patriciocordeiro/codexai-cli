@@ -1,37 +1,33 @@
 .workflowSection {
-  background-color: var(--dark-purple);
-  border-bottom: none;
+  background-color: var(--section-background-color);
+  border-bottom: 1px solid var(--card-border-color);
 }
-
 .sectionTitle {
   font-size: 3rem;
   text-align: center;
   margin-bottom: 5rem;
 }
-
 .stepsContainer {
   display: flex;
   flex-direction: column;
   gap: 6rem;
 }
-
 .step {
   display: grid;
   grid-template-columns: minmax(300px, 1fr) auto;
   align-items: center;
   gap: 4rem;
 }
-
-/* THE NEW CARD STYLE */
 .card {
-  background: var(--light-purple);
+  background: var(--card-background-color);
   padding: 2.5rem;
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--card-border-color);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05);
+}
+html[data-theme='dark'] .card {
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
 }
-
 .iconContainer {
   width: 200px;
   height: 200px;
@@ -39,81 +35,71 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  /* Icon now has no background, it "floats" */
 }
-
+html[data-theme='dark'] .iconContainer {
+  background: var(--section-background-color);
+  border-radius: 50%;
+  border: 1px solid var(--card-border-color);
+  box-shadow: 0 0 40px hsla(182, 100%, 50%, 0.1);
+}
 .textContainer h3 {
   font-size: 2.5rem;
   margin-bottom: 1.5rem;
-  color: var(--neon-cyan);
+  color: var(--accent-color-1);
 }
-
 .textContainer p {
   font-size: 1.1rem;
   line-height: 1.7;
-  color: var(--text-secondary);
-  max-width: 50ch; /* Limits line length for readability */
+  color: var(--text-color);
+  max-width: 50ch;
 }
-
 .textContainer p code {
-  background-color: rgba(13, 12, 29, 0.8); /* A darker background for code */
-  color: var(--neon-green);
+  background-color: var(--section-background-color);
+  color: var(--accent-color-3);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
 }
-
-/* REVERSE LAYOUT LOGIC */
 .reversed {
-  /* Swap the column order */
   grid-template-columns: auto minmax(300px, 1fr);
 }
-
 .reversed .card {
   order: 2;
 }
-
 .reversed .iconContainer {
   order: 1;
 }
-
-.reversed .textContainer h3 {
-  color: var(--neon-magenta);
+html[data-theme='dark'] .reversed .iconContainer {
+  box-shadow: 0 0 40px hsla(320, 100%, 50%, 0.2);
 }
-
-/* RESPONSIVE ADJUSTMENTS */
+.reversed .textContainer h3 {
+  color: var(--accent-color-2);
+}
 @media (max-width: 996px) {
   .step,
   .reversed {
     grid-template-columns: 1fr;
     gap: 2rem;
   }
-
   .card,
   .reversed .card {
     order: 2;
     padding: 1.5rem;
+    text-align: center;
   }
-
   .iconContainer,
   .reversed .iconContainer {
     order: 1;
     width: 150px;
     height: 150px;
+    margin-bottom: 2rem;
   }
-
-  .textContainer {
-    text-align: center;
-  }
-
   .textContainer p {
-    max-width: none; /* Remove line length limit on mobile */
+    max-width: none;
   }
-
   .sectionTitle {
     font-size: 2.5rem;
     margin-bottom: 4rem;
   }
-
   .textContainer h3 {
     font-size: 2rem;
   }

@@ -1,15 +1,11 @@
 .devExSection {
-  background-color: var(
-    --light-purple
-  ); /* Use the lighter purple to stand out */
+  background-color: var(--section-background-color);
 }
-
 .sectionTitle {
   font-size: 3rem;
   text-align: center;
   margin-bottom: 4rem;
 }
-
 .grid {
   display: flex;
   flex-direction: column;
@@ -17,68 +13,63 @@
   max-width: 960px;
   margin: 0 auto;
 }
-
 .row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 1.5rem;
-  background: var(--dark-purple);
+  background: var(--card-background-color);
   padding: 1.5rem 2rem;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--card-border-color);
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
 }
-
 .row:hover {
   transform: scale(1.03);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
-
 .columnBefore,
 .columnAfter {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
-
 .iconWrapper {
   flex-shrink: 0;
 }
-
+.iconWrapper svg {
+  color: var(--text-color);
+}
+.columnAfter .iconWrapper svg {
+  color: var(--accent-color-3);
+}
 .columnBefore p {
-  color: var(--text-secondary);
+  color: var(--text-color);
   font-style: italic;
   margin: 0;
 }
-
 .columnAfter p {
-  color: var(--text-primary);
+  color: var(--heading-color);
   font-weight: bold;
   margin: 0;
 }
-
 .arrow {
   font-size: 2rem;
-  color: var(--neon-magenta);
+  color: var(--accent-color-2);
   font-family: 'Orbitron', sans-serif;
 }
-
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .row {
     grid-template-columns: 1fr;
     gap: 1rem;
     padding: 1.5rem;
   }
-
   .arrow {
     transform: rotate(90deg);
     margin: 0.5rem 0;
   }
-
   .columnBefore,
   .columnAfter {
     text-align: center;

@@ -1,12 +1,15 @@
 import type * as Preset from '@docusaurus/preset-classic';
 import type { Config } from '@docusaurus/types';
 import { themes as prismThemes } from 'prism-react-renderer';
+import { navItems } from './routes';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+const webAppUrl =
+  'https://codex-ai-30da8-105725632786.europe-southwest1.run.app'; // CHANGE THIS to your actual web app URL
 const config: Config = {
-  title: 'My Site',
-  tagline: 'Dinosaurs are cool',
+  title: 'CodexAi',
+  tagline: 'AI-powered code analysis and automated code review',
   favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -20,13 +23,19 @@ const config: Config = {
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
 
+  customFields: {
+    webAppUrl,
+    signupUrl: `${webAppUrl}/signup`,
+  },
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'patriciocordeiro', // Usually your GitHub org/user name.
+  projectName: 'codexai', // Usually your repo name.
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
+  deploymentBranch: 'gh-pages',
+  trailingSlash: false,
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -44,24 +53,12 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
+          path: 'docs',
           editUrl:
             'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
-        blog: {
-          showReadingTime: true,
-          feedOptions: {
-            type: ['rss', 'atom'],
-            xslt: true,
-          },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
-        },
+        blog: false,
+
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -70,118 +67,49 @@ const config: Config = {
   ],
 
   themeConfig: {
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/docusaurus-social-card.jpg', // CHANGE THIS
     navbar: {
-      title: 'My Site',
+      title: 'CodeAI', // Use your project name
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: 'CodeAI Logo',
+        src: 'img/logo.svg', // CHANGE THIS
       },
-      items: [
-        // Left-aligned items
-        {
-          label: 'Features',
-          to: '/#features', // Links to the section with id="features"
-          activeBasePath: ' ', // Marks as active on the homepage
-          position: 'right',
-        },
-        {
-          label: 'Workflow',
-          to: '/#workflow',
-          activeBasePath: ' ',
-          position: 'right',
-        },
-        {
-          label: 'Benefits',
-          to: '/#benefits',
-          activeBasePath: ' ',
-          position: 'right',
-        },
-        {
-          label: 'Pricing',
-          to: '/#pricing',
-          activeBasePath: ' ',
-          position: 'right',
-        },
-        {
-          label: 'Docs',
-          to: '/docs/introduction', // Links to your documentation
-          position: 'right',
-        },
-
-        // --- ADD THIS NEW BUTTON ---
-        {
-          label: 'Get Started',
-          to: 'https://app.yourdomain.com/signup', // CHANGE THIS to your actual web app signup URL
-          position: 'right',
-          className: 'header-cta-button', // Custom class for styling
-        },
-
-        // Right-aligned items
-        {
-          href: 'https://github.com/your-organization/your-repo', // CHANGE THIS
-          position: 'right',
-          className: 'header-github-link',
-          'aria-label': 'GitHub repository',
-        },
-      ],
+      hideOnScroll: false,
+      items: navItems,
     },
-
     footer: {
       style: 'dark',
       links: [
         {
           title: 'Product',
           items: [
-            {
-              label: 'Benefits',
-              to: '/#benefits',
-            },
-            {
-              label: 'Workflow',
-              to: '/#workflow',
-            },
-            {
-              label: 'Pricing',
-              to: '/#pricing',
-            },
+            { label: 'Benefits', to: '/#benefits' },
+            { label: 'Workflow', to: '/#workflow' },
+            { label: 'Pricing', to: '/#pricing' },
           ],
         },
         {
           title: 'Resources',
           items: [
-            {
-              label: 'Documentation',
-              to: '/docs/introduction',
-            },
+            { label: 'Documentation', to: '/docs/introduction' },
             {
               label: 'GitHub',
-              href: 'https://github.com/your-organization/your-repo', // CHANGE THIS
-            },
-            {
-              label: 'Discord',
-              href: 'https://your-discord-invite.com', // CHANGE THIS
-            },
+              href: 'https://github.com/your-organization/your-repo',
+            }, // CHANGE THIS
+            { label: 'Discord', href: 'https://your-discord-invite.com' }, // CHANGE THIS
           ],
         },
         {
           title: 'Legal',
           items: [
-            {
-              label: 'Privacy Policy',
-              to: '/privacy', // We will need to create this page
-            },
-            {
-              label: 'Terms of Service',
-              to: '/terms', // We will need to create this page
-            },
+            { label: 'Privacy Policy', to: '/privacy' },
+            { label: 'Terms of Service', to: '/terms' },
           ],
         },
       ],
       logo: {
         alt: 'CodeAI Logo',
-        src: 'img/logo.svg', // CHANGE THIS to your logo
+        src: 'img/logo.svg', // CHANGE THIS
         href: '/',
         width: 160,
       },

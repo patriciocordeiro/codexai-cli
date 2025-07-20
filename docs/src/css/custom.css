@@ -1,102 +1,108 @@
-/* --- FONTS & ROOT VARIABLES --- */
+/* --- FONTS & THEME SETUP --- */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Share+Tech+Mono&display=swap');
 
+/**
+ * =================================================================
+ * DEFAULT (LIGHT MODE) THEME
+ * All default styles and variables are defined here.
+ * =================================================================
+ */
 :root {
-  background: #080529;
   --ifm-font-family-base: 'Share Tech Mono', monospace;
   --ifm-font-family-monospace: 'Share Tech Mono', monospace;
+  --ifm-heading-font-family: 'Orbitron', sans-serif;
+  --ifm-color-primary: #5d35b1; /* A professional deep purple for light mode primary */
 
-  /* Neon & Dark Palette */
-  --neon-cyan: #00f6ff;
-  --neon-magenta: #ff00c1;
-  --neon-green: #00ff87;
-  --dark-purple: #0d0c1d;
-  --light-purple: #1c1b2e;
-  --text-primary: #f0f0f8;
-  --text-secondary: #a0a0b8;
-
-  --ifm-color-primary: var(--neon-cyan);
-
-  --nebula-glow-purple: hsl(270, 90%, 15%);
-  --dark-nebula-magenta: hsl(320, 100%, 7%);
-  --dark-nebula-cyan: hsl(182, 100%, 7%);
+  /* --- Semantic Color Palette --- */
+  --landing-background-color: #ffffff;
+  --section-background-color: #f7f9fc;
+  --card-background-color: #ffffff;
+  --card-border-color: #e0e6ed;
+  --heading-color: #1c1e21;
+  --text-color: #525252;
+  --accent-color-1: #5d35b1;
+  --accent-color-2: #8e2de2;
+  --accent-color-3: #007bff;
+  --navbar-background-gradient: linear-gradient(to right, #ffffff, #f7f9fc);
 }
 
+/**
+ * =================================================================
+ * DARK MODE OVERRIDES
+ * We override the root variables when the dark theme is active.
+ * =================================================================
+ */
 html[data-theme='dark'] {
-  background-color: var(--dark-purple);
+  --ifm-color-primary: #00f6ff;
+
+  /* --- Semantic Color Palette --- */
+  --landing-background-color: #0d0c1d;
+  --section-background-color: #1c1b2e;
+  --card-background-color: #0d0c1d;
+  --card-border-color: rgba(255, 255, 255, 0.1);
+  --heading-color: #f0f0f8;
+  --text-color: #a0a0b8;
+  --accent-color-1: #00f6ff; /* Neon Cyan */
+  --accent-color-2: #ff00c1; /* Neon Magenta */
+  --accent-color-3: #00ff87; /* Neon Green */
+  --navbar-background-gradient: linear-gradient(to right, #1c1b2e, #0d0c1d);
+
+  /* --- Dark-Mode-Only Special Colors for Glows --- */
+  --nebula-glow-main: hsl(270, 90%, 15%); /* Deep Purple */
+  --nebula-glow-secondary-1: hsl(320, 100%, 15%); /* Magenta */
+  --nebula-glow-secondary-2: hsl(182, 100%, 12%); /* Cyan */
+}
+
+/* =================================================================
+ * GLOBAL & UTILITY STYLES
+ * These styles are theme-agnostic because they use our semantic variables.
+ * =================================================================
+ */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  background-color: var(--landing-background-color);
+}
+
+/* Nebula background ONLY appears in dark mode */
+html[data-theme='dark'] body {
   background-image:
     radial-gradient(at 20% 20%, hsla(282, 87%, 50%, 0.15) 0px, transparent 50%),
     radial-gradient(at 80% 20%, hsla(212, 97%, 49%, 0.15) 0px, transparent 50%),
     radial-gradient(at 20% 80%, hsla(335, 96%, 63%, 0.15) 0px, transparent 50%),
     radial-gradient(at 80% 80%, hsla(165, 96%, 49%, 0.1) 0px, transparent 50%);
-  scroll-padding-top: 80px;
 }
 
-/* Make the navbar background match our theme */
-.navbar {
-  background-color: rgba(
-    13,
-    12,
-    29,
-    0.8
-  ); /* Dark purple with some transparency */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-/* Style the GitHub link to be just an icon */
-.header-github-link:hover {
-  opacity: 0.7;
-}
-
-.header-github-link::before {
-  content: '';
-  width: 24px;
-  height: 24px;
-  display: flex;
-  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='white' d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E")
-    no-repeat;
-  background-size: contain;
-}
 main {
   background-color: transparent;
 }
 
-.header-cta-button {
-  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
-  color: white !important; /* Use !important to override default link styles */
-  padding: 0.5rem 1.5rem;
-  border-radius: 20px; /* Pill shape */
-  font-family: 'Orbitron', sans-serif;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-/* --- GLOBAL STYLES --- */
 h1,
 h2,
 h3,
 h4 {
-  font-family: 'Orbitron', sans-serif;
-  color: var(--text-primary);
-  text-shadow: 0 0 8px rgba(0, 246, 255, 0.2);
+  font-family: var(--ifm-heading-font-family);
+  color: var(--heading-color);
 }
 p {
-  color: var(--text-secondary);
+  color: var(--text-color);
 }
 
 .section-padding {
   padding: 6rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.animated-gradient-text {
+/* Animated gradient text effect */
+html[data-theme='dark'] .animated-gradient-text {
   background: linear-gradient(
     90deg,
-    var(--neon-cyan),
-    var(--neon-magenta),
-    var(--neon-green),
-    var(--neon-cyan)
+    var(--accent-color-1),
+    var(--accent-color-2),
+    var(--accent-color-3),
+    var(--accent-color-1)
   );
   background-size: 200% auto;
   color: transparent;
@@ -105,8 +111,70 @@ p {
   animation: animateGradient 10s linear infinite;
 }
 
+/* In light mode, it's a solid, professional color */
+html[data-theme='light'] .animated-gradient-text {
+  color: var(--accent-color-1);
+}
+
 @keyframes animateGradient {
   to {
     background-position: 200% center;
   }
+}
+
+/* =================================================================
+ * HEADER / NAVBAR STYLES
+ * =================================================================
+ */
+.navbar {
+  background: var(--navbar-background-gradient);
+  border-bottom: 1px solid var(--card-border-color);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.header-github-link:hover {
+  opacity: 0.7;
+}
+.header-github-link::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  display: flex;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E");
+}
+html[data-theme='light'] .header-github-link::before {
+  color: var(--heading-color);
+}
+html[data-theme='dark'] .header-github-link::before {
+  color: #ffffff;
+}
+
+.header-cta-button {
+  background: linear-gradient(
+    90deg,
+    var(--accent-color-1),
+    var(--accent-color-2)
+  );
+  color: white !important;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+.header-cta-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px hsla(262, 70%, 50%, 0.25);
+  color: white !important;
+  text-decoration: none;
+}
+html[data-theme='dark'] .header-cta-button:hover {
+  box-shadow:
+    0 8px 25px hsla(182, 100%, 50%, 0.25),
+    0 5px 15px hsla(320, 100%, 50%, 0.25);
 }

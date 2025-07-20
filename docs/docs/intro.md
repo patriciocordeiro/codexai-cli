@@ -2,7 +2,6 @@
 id: introduction
 title: Introduction
 sidebar_position: 0
-slug: /
 ---
 
 # Welcome to CodeAI CLI
@@ -34,6 +33,6 @@ All analysis results and detailed reports are presented in your web browser, pro
 
 Explore the detailed documentation for each `codeai` command:
 
-*   [**`analyze`**](/docs/analyze) - Upload your project for AI analysis.
-*   [**`login`**](/docs/login) - Authenticate your CLI session.
-*   [**`logout`**](/docs/logout) - End your CLI session.
+*   [**`analyze`**](/docs/usage/analyze) - Upload your project for AI analysis.
+*   [**`login`**](/docs/usage/login) - Authenticate your CLI session.
+*   [**`logout`**](/docs/usage/logout) - End your CLI session.

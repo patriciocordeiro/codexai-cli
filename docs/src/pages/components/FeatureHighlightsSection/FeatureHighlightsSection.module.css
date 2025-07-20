@@ -1,5 +1,5 @@
 .featuresSection {
-  background-color: var(--light-purple);
+  background-color: var(--landing-background-color);
   text-align: center;
 }
 
@@ -10,49 +10,51 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 2rem;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
 .featureCard {
-  background: var(--dark-purple);
+  background: var(--card-background-color);
   padding: 2rem 1.5rem;
   border-radius: 12px;
-  border: 1px solid transparent;
+  /*
+    THIS IS THE KEY FIX:
+    The card now has a visible border by default, using our theme-aware variable.
+  */
+  border: 1px solid var(--card-border-color);
   transition: all 0.3s ease;
 }
 
 .featureCard:hover {
   transform: translateY(-5px);
-  border-color: var(--neon-cyan);
-  background: #1c1b2e; /* Use light-purple on hover */
+  /* The border color changes to the primary accent color on hover */
+  border-color: var(--accent-color-1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+/* Add the glow effect specifically for dark mode hover */
+html[data-theme='dark'] .featureCard:hover {
+  box-shadow: 0 0 30px hsla(182, 100%, 50%, 0.2);
 }
 
 .iconWrapper {
   margin-bottom: 1.5rem;
-  color: var(--neon-cyan);
+  color: var(--accent-color-1);
 }
 
 .cardTitle {
   font-size: 1.3rem;
   margin-bottom: 0.75rem;
-  color: var(--text-primary);
+  color: var(--heading-color);
 }
 
 .cardDescription {
-  color: var(--text-secondary);
+  color: var(--text-color);
   font-size: 0.95rem;
   line-height: 1.6;
-}
-
-/* ADD THIS NEW BLOCK at the end */
-.fourItems {
-  /* On desktop, this will be a 2x2 grid */
-  grid-template-columns: repeat(2, 1fr);
-  max-width: 800px; /* Make it a bit narrower for a more focused look */
-  gap: 2.5rem; /* A little more space */
 }
 
 /* Responsive adjustments for tablet and mobile */
@@ -67,23 +69,6 @@
     font-size: 2.5rem;
   }
   .grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
-
-/* On large screens, we can go back to 4-wide if we want, or keep it 2x2 */
-@media (min-width: 1200px) {
-  .fourItems {
-    /* You can uncomment this to make it a 4-wide row on very large screens */
-    grid-template-columns: repeat(4, 1fr);
-    max-width: 1200px;
-  }
-}
-
-/* Ensure mobile stacking is correct */
-@media (max-width: 768px) {
-  .fourItems {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }

@@ -1,0 +1,72 @@
+.ctaSection {
+  padding: 6rem 0 7rem 0; /* More padding at the bottom */
+  text-align: center;
+  background-color: var(--dark-purple);
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Re-use the hero gradient for a nice bookend effect */
+/* .ctaSection::before {
+  content: '';
+  position: absolute;
+  bottom: -50%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1000px;
+  height: 1000px;
+  background: radial-gradient(
+    circle,
+    var(--nebula-glow-purple),
+    transparent 70%
+  );
+  filter: blur(150px);
+  z-index: 0;
+} */
+
+.ctaSection .container {
+  position: relative;
+  z-index: 1;
+}
+
+.title {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  margin-bottom: 2.5rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaButton {
+  background: linear-gradient(
+    90deg,
+    var(--accent-color-1),
+    var(--accent-color-2)
+  );
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 2.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+.ctaButton:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px hsla(262, 70%, 50%, 0.3);
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 2.5rem;
+  }
+}

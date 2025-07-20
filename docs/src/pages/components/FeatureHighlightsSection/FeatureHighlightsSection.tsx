@@ -72,6 +72,7 @@ const FeatureCard = ({ icon, title, description }) => (
 export default function FeatureHighlightsSection() {
   return (
     <motion.section
+      id="features"
       className={`section-padding ${styles.featuresSection}`}
       initial="hidden"
       whileInView="visible"
@@ -80,7 +81,8 @@ export default function FeatureHighlightsSection() {
     >
       <div className="container">
         <h2 className={styles.sectionTitle}>
-          A Complete Code Quality Platform
+          A Complete Code{' '}
+          <span className="animated-gradient-text">Quality</span> Platform
         </h2>
         {/* We will change the grid class to support 4 items better */}
         <div className={`${styles.grid} ${styles.fourItems}`}>

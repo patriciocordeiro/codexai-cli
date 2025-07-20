@@ -1,8 +1,10 @@
-import Link from '@docusaurus/Link';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import { motion } from 'framer-motion';
+import CtaButton from '../CtaButton/CtaButton';
 import styles from './HomepageHeader.module.css';
 
 export default function HomepageHeader() {
+  const { siteConfig } = useDocusaurusContext();
   return (
     <motion.header
       className={styles.heroBanner}
@@ -10,7 +12,7 @@ export default function HomepageHeader() {
       animate={{ opacity: 1 }}
       transition={{ duration: 1 }}
     >
-      <div className="container">
+      <div className={styles.headerContent}>
         <motion.h1
           className={styles.heroTitle}
           initial={{ y: 50, opacity: 0 }}
@@ -31,17 +33,14 @@ export default function HomepageHeader() {
           confidence.
         </motion.p>
         <motion.div
+          className={styles.ctaSection}
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          <div className={styles.installCommand}>
-            <span className={styles.promptSymbol}>$</span>
-            <code>npm install -g codeai-cli</code>
-          </div>
-          <Link className={styles.ctaButton} to="/docs/introduction">
-            Get Started
-          </Link>
+          <CtaButton to={siteConfig.customFields.signupUrl as string}>
+            Create Free Account
+          </CtaButton>
         </motion.div>
       </div>
       <div className={styles.heroBgGradient} />
