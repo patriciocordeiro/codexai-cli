@@ -6,8 +6,8 @@ import {
   it,
   jest,
 } from '@jest/globals';
+import { IS_PRODUCTION, NODE_ENV } from '../constants/constants';
 import { logConfiguration, Logger, validateEnvironment } from './config';
-import { IS_PRODUCTION, NODE_ENV } from './constants';
 
 describe('Logger', () => {
   let consoleDebugSpy: ReturnType<typeof jest.spyOn>;

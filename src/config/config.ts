@@ -4,7 +4,7 @@ import {
   LOG_LEVEL,
   NODE_ENV,
   WEB_APP_URL,
-} from './constants';
+} from '../constants/constants';
 
 /**
  * Logger utility with different levels

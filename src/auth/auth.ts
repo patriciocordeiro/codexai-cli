@@ -5,8 +5,12 @@ import ora from 'ora';
 import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { API_BASE_URL, CLI_CONFIG_DIR, WEB_APP_URL } from './constants';
-import { openBrowser } from './helpers';
+import {
+  API_BASE_URL,
+  CLI_CONFIG_DIR,
+  WEB_APP_URL,
+} from '../constants/constants';
+import { openBrowser } from '../helpers/helpers';
 
 if (!CLI_CONFIG_DIR || !API_BASE_URL || !WEB_APP_URL) {
   console.error(
@@ -130,4 +134,19 @@ export async function webLogin(): Promise<void> {
  */
 export async function logout(): Promise<void> {
   await removeApiKey();
+}
+
+/**
+ * Checks if the user is authenticated by loading the API key.
+ * If not authenticated, it throws an error.
+ * @returns The API key if authenticated.
+ */
+export async function checkAuthentication(): Promise<string> {
+  const apiKey = await loadApiKey();
+  if (!apiKey) {
+    console.error('❌ You must be logged in. Please run `codeai login`.');
+    throw new Error('Authentication required');
+  }
+  console.log('✅ Authenticated.');
+  return apiKey;
 }
