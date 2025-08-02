@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -13,3 +14,7 @@ export const IS_PRODUCTION = NODE_ENV === 'production';
 
 export const WEB_APP_URL = process.env.CODEAI_WEB_URL;
 export const API_BASE_URL = process.env.CODEAI_API_URL;
+
+// --- File System ---
+export const CONFIG_FILE_NAME = '.codeai.json';
+export const CONFIG_FILE_PATH = path.join(process.cwd(), CONFIG_FILE_NAME);

@@ -7,6 +7,11 @@ import * as path from 'path';
 import Stream from 'stream';
 
 /**
+ * Normalizes path separators to always be forward slashes ('/').
+ */
+const _normalizePath = (p: string) => p.replace(/\\/g, '/');
+
+/**
  * Gathers a list of all files to be included in the upload, respecting .gitignore.
  * @returns An array of file paths relative to the project root.
  */
@@ -40,35 +45,6 @@ export async function getFilesToUpload(): Promise<string[]> {
   const includedFiles = allFiles.filter(file => !ig.ignores(file));
 
   return includedFiles;
-}
-
-/**
- * Calculates a content hash for a given file.
- * @param filePath The path to the file.
- * @returns The SHA1 hash of the file's content.
- */
-async function getFileHash(filePath: string): Promise<string> {
-  const fileBuffer = await fse.readFile(filePath);
-  return hash(fileBuffer, { algorithm: 'sha1' });
-}
-
-/**
- * Creates a manifest of files with their content hashes.
- * @param filePaths An array of file paths relative to the project root.
- * @returns A manifest object mapping file paths to their hashes.
- */
-export async function createFileManifest(
-  filePaths: string[]
-): Promise<Record<string, string>> {
-  const manifest: Record<string, string> = {};
-  const projectRoot = process.cwd();
-
-  for (const relativePath of filePaths) {
-    const absolutePath = path.join(projectRoot, relativePath);
-    manifest[relativePath] = await getFileHash(absolutePath);
-  }
-
-  return manifest;
 }
 
 /**
@@ -112,11 +88,6 @@ export async function createZipFromPaths(
     })();
   });
 }
-
-/**
- * Normalizes path separators to always be forward slashes ('/').
- */
-const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 /**
  * Scans a target directory, filters files according to default rules and .gitignore,
@@ -171,7 +142,7 @@ export async function createProjectArchive(
     const pathFromProjectRoot = path.join(targetDirectory, file);
     if (!ig.ignores(pathFromProjectRoot)) {
       // If not ignored, add the final, normalized path to our list.
-      includedFilesFinal.push(normalizePath(pathFromProjectRoot));
+      includedFilesFinal.push(_normalizePath(pathFromProjectRoot));
     }
   }
 

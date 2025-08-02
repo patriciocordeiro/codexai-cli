@@ -15,7 +15,7 @@ import {
   getProjectManifest,
   triggerAnalysis,
   updateProjectFiles,
-} from '../api/api';
+} from './api';
 
 // Mock external dependencies
 jest.mock('axios');
@@ -179,6 +179,8 @@ describe('api', () => {
       mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
 
       // Act
+
+      // Assert
       const result = await triggerAnalysis(
         apiKey,
         projectId,
@@ -188,7 +190,6 @@ describe('api', () => {
         filesForAnalysis
       );
 
-      // Assert
       const oraSpinner = mockedOra.mock.results[0].value as {
         start: jest.Mock;
         succeed: jest.Mock;
@@ -230,7 +231,6 @@ describe('api', () => {
       // Arrange
       const apiError = new Error('API request failed');
       mockedAxios.post.mockRejectedValue(apiError);
-
       // Act & Assert
       await expect(
         triggerAnalysis(
@@ -334,10 +334,21 @@ describe('api', () => {
       );
       expect(formInstance.append).toHaveBeenCalledWith('projectId', projectId);
 
+      const rawHeaders =
+        typeof formInstance.getHeaders === 'function'
+          ? formInstance.getHeaders()
+          : undefined;
+      const headers =
+        rawHeaders &&
+        typeof rawHeaders === 'object' &&
+        !Array.isArray(rawHeaders)
+          ? { ...rawHeaders }
+          : {};
+
       expect(mockedAxios.post).toHaveBeenCalledWith(endpointUrl, formInstance, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          ...(formInstance.getHeaders?.() || {}),
+          ...headers,
         },
       });
 
