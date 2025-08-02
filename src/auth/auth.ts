@@ -10,7 +10,7 @@ import {
   CLI_CONFIG_DIR,
   WEB_APP_URL,
 } from '../constants/constants';
-import { openBrowser } from '../helpers/helpers';
+import { openBrowser } from '../helpers/cli/cli-helpers';
 
 if (!CLI_CONFIG_DIR || !API_BASE_URL || !WEB_APP_URL) {
   console.error(
