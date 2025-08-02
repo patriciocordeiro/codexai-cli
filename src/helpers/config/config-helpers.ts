@@ -2,12 +2,7 @@ import chalk from 'chalk';
 import fse from 'fs-extra';
 import ora from 'ora';
 import path from 'path';
-
-export interface CodeAiConfig {
-  projectId: string;
-  targetDirectory: string;
-  maxUploadSizeMB?: number;
-}
+import { CodeAiConfig } from '../../models/config.model';
 
 export async function getTargetDirectory(): Promise<string> {
   const configPath = path.join(process.cwd(), '.codeai.json');

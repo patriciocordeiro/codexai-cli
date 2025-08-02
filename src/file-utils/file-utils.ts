@@ -37,7 +37,7 @@ export async function getFilesToUpload(): Promise<string[]> {
   const ig = ignore();
   const gitignorePath = path.join(projectRoot, '.gitignore');
   if (await fse.pathExists(gitignorePath)) {
-    const gitignoreContent = await fse.readFile(gitignorePath, 'utf-8');
+    const gitignoreContent = fse.readFileSync(gitignorePath, 'utf-8');
     ig.add(gitignoreContent);
   }
 

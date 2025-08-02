@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import fse from 'fs-extra';
 import ora from 'ora';
 import path from 'path';
-import { CodeAiConfig } from '../config/config-helpers';
+import { CodeAiConfig } from '../../models/config.model';
 
 export function isSupportedCodeFile(filePath: string): boolean {
   return /\.(js|jsx|ts|tsx|json|md|txt|cjs|mjs|css|scss|html|yml|yaml|xml|csv|py|java|go|rb|php|sh|bat|dockerfile|env|tsconfig|eslintrc|prettierrc|gitignore|lock|toml|ini|pl|swift|rs|cpp|h|hpp|c|cs|vb|fs|kt|dart|scala|sql|r|jl|ipynb|sln|props|targets|gradle|makefile|mk|cmake|asm|vue|svelte|astro|tsx|jsx)$/.test(
@@ -40,22 +40,15 @@ export async function checkUploadSize(
           `❌ Total size of files to upload (${totalSizeMB.toFixed(2)}MB) exceeds the project limit of ${limitMB}MB.`
         )
       );
-      console.error(
-        chalk.yellow(
-          `   You can increase this limit by editing the 'maxUploadSizeMB' value in your .codeai.json file.`
-        )
-      );
-      console.error(
-        chalk.dim(
-          `   Note: A hard limit of 50MB is enforced on the server to prevent abuse.`
-        )
-      );
 
-      throw new Error();
+      throw new Error(
+        `Total size of files to upload (${totalSizeMB.toFixed(2)}MB) exceeds the project limit of ${limitMB}MB.`
+      );
     }
     spinner.succeed(`Upload size check passed (${totalSizeMB.toFixed(2)}MB).`);
   } catch (error) {
     spinner.fail('Failed to calculate upload size.');
-    console.error(error);
+    console.error(chalk.red('Error calculating upload size:'), error);
+    throw new Error('Failed to calculate upload size.');
   }
 }

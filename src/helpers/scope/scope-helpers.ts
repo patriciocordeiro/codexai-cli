@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import ora from 'ora';
 import path from 'path';
 import { CONFIG_FILE_PATH } from '../../constants/constants';
-import { CodeAiConfig, loadProjectConfig } from '../config/config-helpers';
+import { CodeAiConfig } from '../../models/config.model';
+import { loadProjectConfig } from '../config/config-helpers';
 import { isExcludedPath, isSupportedCodeFile } from '../file/file-helpers';
 
 export function getFilesForScope(

@@ -24,6 +24,7 @@ jest.mock('chalk', () => ({
     yellow: jest.fn(text => `yellow:${text}`),
   },
 }));
+
 jest.mock('fs-extra', () => ({
   readJson: jest.fn(),
   writeJson: jest.fn(),
@@ -32,6 +33,7 @@ jest.mock('fs-extra', () => ({
   writeFileSync: jest.fn(),
   pathExists: jest.fn(() => Promise.resolve(true)),
 }));
+
 jest.mock('fs', () => ({
   existsSync: jest.fn(),
   readFileSync: jest.fn(),
