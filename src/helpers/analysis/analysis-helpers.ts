@@ -25,7 +25,7 @@ import {
  */
 export async function setupAnalysisContext(): Promise<AnalysisContext> {
   const { projectId } = await loadProjectConfig(CONFIG_FILE_PATH);
-  console.log(`🚀 Starting analysis for project ${chalk.bold(projectId)}...`);
+  console.info(`🚀 Starting analysis for project ${chalk.bold(projectId)}...`);
   const apiKey = await checkAuthentication(loadApiKey);
   return { projectId, apiKey };
 }
@@ -51,7 +51,7 @@ export async function getAnalysisScope({
  * Displays a message when there are no files to analyze in the specified scope.
  */
 export function displayNoFilesToAnalyze(): void {
-  console.log(chalk.yellow('No files to analyze in the specified scope.'));
+  console.info(chalk.yellow('No files to analyze in the specified scope.'));
 }
 
 /**
@@ -89,8 +89,8 @@ export async function triggerAnalysisAndDisplayResults({
     filesForAnalysis: targetFilePaths,
   });
   spinner.succeed('Analysis successfully initiated!');
-  console.log('\n✅ View analysis progress and results at:');
-  console.log(chalk.blue.underline(resultsUrl));
+  console.info('\n✅ View analysis progress and results at:');
+  console.info(chalk.blue.underline(resultsUrl));
   if (!IS_PRODUCTION) {
     openBrowser(resultsUrl);
   }

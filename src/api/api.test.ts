@@ -105,8 +105,8 @@ describe('api', () => {
     let consoleLogSpy: ReturnType<typeof jest.spyOn>;
 
     beforeEach(() => {
-      // Spy on console.log to verify logging behavior
-      consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      // Spy on console.info to verify logging behavior
+      consoleLogSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
     });
 
     afterEach(() => {

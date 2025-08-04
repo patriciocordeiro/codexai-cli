@@ -46,7 +46,7 @@ program
   .description('Sign out and remove the local API key.')
   .action(async () => {
     await logout();
-    console.log('✅ You have been logged out.');
+    console.info('✅ You have been logged out.');
   });
 
 program

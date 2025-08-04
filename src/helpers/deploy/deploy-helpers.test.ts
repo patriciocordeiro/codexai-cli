@@ -112,7 +112,7 @@ describe('deploy-helpers', () => {
     ora.mockReturnValue(mockSpinner);
 
     // Mock console methods
-    mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockConsoleLog = jest.spyOn(console, 'info').mockImplementation(() => {});
     mockConsoleError = jest
       .spyOn(console, 'error')
       .mockImplementation(() => {});

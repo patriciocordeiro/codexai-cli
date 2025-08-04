@@ -88,15 +88,15 @@ export async function webLogin(): Promise<void> {
   const sessionId = uuidv4();
   const loginUrl = `${WEB_APP_URL}/${WEB_LOGIN_PAGE_LINK}?session=${sessionId}`;
 
-  console.log(
+  console.info(
     chalk.bold('\nTo complete authentication, your browser will now open.')
   );
-  console.log(
+  console.info(
     chalk.dim('If it does not open automatically, please visit this URL:')
   );
 
   // Use chalk to style the link, making it easy to see and copy
-  console.log(chalk.cyan.underline(loginUrl));
+  console.info(chalk.cyan.underline(loginUrl));
 
   // --- Automatically open the browser ---
   try {

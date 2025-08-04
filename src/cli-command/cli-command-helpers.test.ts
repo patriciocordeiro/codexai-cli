@@ -75,11 +75,11 @@ const mockedGetAnalysisScope = getAnalysisScope as jest.Mock;
 
 // --- Test Suite ---
 describe('command-helpers', () => {
-  let consoleLogSpy: jest.SpiedFunction<typeof console.log>;
+  let consoleLogSpy: jest.SpiedFunction<typeof console.info>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleLogSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
   });
 
   afterEach(() => {

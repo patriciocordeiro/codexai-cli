@@ -44,7 +44,7 @@ describe('cli-helpers', () => {
     exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
-    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    logSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
   });
   afterEach(() => {
     exitSpy.mockRestore();

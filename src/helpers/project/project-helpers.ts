@@ -229,12 +229,12 @@ export async function saveProjectConfiguration({
  * @param {string} projectUrl - The URL of the created project.
  */
 export function displayProjectCreationSuccessMessage(projectUrl: string): void {
-  console.log(chalk.bold.green('\nProject created and linked successfully!'));
-  console.log('To run your first analysis, use the command:');
-  console.log(chalk.cyan('  codeai run options'));
+  console.info(chalk.bold.green('\nProject created and linked successfully!'));
+  console.info('To run your first analysis, use the command:');
+  console.info(chalk.cyan('  codeai run options'));
 
   if (!IS_PRODUCTION) {
-    console.log(
+    console.info(
       `You can also view your project at: ${chalk.blue.underline(projectUrl)}`
     );
     openBrowser(projectUrl).catch(() => {
@@ -245,7 +245,7 @@ export function displayProjectCreationSuccessMessage(projectUrl: string): void {
       );
     });
   } else {
-    console.log(chalk.bold.green(`Visit your project at: ${projectUrl}`));
+    console.info(chalk.bold.green(`Visit your project at: ${projectUrl}`));
   }
 }
 

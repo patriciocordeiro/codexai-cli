@@ -194,8 +194,8 @@ export async function uploadPatch({
  * @returns {void}
  */
 export function displayDeploymentSuccess(): void {
-  console.log('\nYou can now run an analysis on the updated project:');
-  console.log(chalk.cyan('  codeai run REVIEW'));
+  console.info('\nYou can now run an analysis on the updated project:');
+  console.info(chalk.cyan('  codeai run REVIEW'));
 }
 
 /**

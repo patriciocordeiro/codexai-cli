@@ -102,13 +102,13 @@ jest.mock('ora', () =>
 // --- Test Suite ---
 
 describe('analysis-helpers', () => {
-  let consoleLogSpy: jest.SpiedFunction<typeof console.log>;
+  let consoleLogSpy: jest.SpiedFunction<typeof console.info>;
   let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
   let processExitSpy: jest.SpiedFunction<typeof process.exit>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleLogSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     // Mock process.exit to throw an error instead of killing the test process
     processExitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {

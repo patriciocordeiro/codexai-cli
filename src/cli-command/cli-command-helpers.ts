@@ -84,7 +84,7 @@ export async function programDeploy(): Promise<void> {
   const spinner = ora();
 
   try {
-    console.log('🚀 Deploying file changes to CodeAI...');
+    console.info('🚀 Deploying file changes to CodeAI...');
 
     // Setup deployment context
     const { projectId, apiKey, targetDirectory } =

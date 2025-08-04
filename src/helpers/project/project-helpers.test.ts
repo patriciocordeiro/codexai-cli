@@ -231,11 +231,11 @@ describe('project-helpers', () => {
   });
 
   describe('displayProjectCreationSuccessMessage', () => {
-    let logSpy: jest.SpiedFunction<typeof console.log>;
+    let logSpy: jest.SpiedFunction<typeof console.info>;
     let warnSpy: jest.SpiedFunction<typeof console.warn>;
 
     beforeEach(() => {
-      logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      logSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
       warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       (constants.IS_PRODUCTION as boolean) = false;
     });

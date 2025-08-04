@@ -9,12 +9,12 @@ import { FILE_RUN_LIMIT } from '../../constants/constants';
  */
 export async function confirmFileLimit(fileCount: number): Promise<void> {
   if (fileCount > FILE_RUN_LIMIT) {
-    console.log(
+    console.info(
       chalk.yellow(
         `\n⚠️  This analysis will process ${fileCount} files, which is more than the recommended limit of ${FILE_RUN_LIMIT}.`
       )
     );
-    console.log(
+    console.info(
       chalk.yellow(
         '   This may result in a longer processing time and higher costs.'
       )
@@ -28,7 +28,7 @@ export async function confirmFileLimit(fileCount: number): Promise<void> {
       },
     ]);
     if (!proceed) {
-      console.log(chalk.red('Analysis cancelled by user.'));
+      console.info(chalk.red('Analysis cancelled by user.'));
       throw new Error('Analysis cancelled by user.');
     }
   }

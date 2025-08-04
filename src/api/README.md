@@ -22,7 +22,7 @@ try {
     zipBuffer: buffer,
     fileManifest: manifest,
   });
-  console.log('✅ Project created successfully!');
+  console.info('✅ Project created successfully!');
 } catch (error) {
   displayError(error as Error);
   process.exit(1);
