@@ -8,12 +8,14 @@ import Stream from 'stream';
 
 /**
  * Normalizes path separators to always be forward slashes ('/').
+ * @param {string} p - The path to normalize.
+ * @returns {string} The normalized path with forward slashes.
  */
 const _normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 /**
  * Gathers a list of all files to be included in the upload, respecting .gitignore.
- * @returns An array of file paths relative to the project root.
+ * @returns {Promise<string[]>} An array of file paths relative to the project root.
  */
 export async function getFilesToUpload(): Promise<string[]> {
   const projectRoot = process.cwd();
@@ -48,12 +50,10 @@ export async function getFilesToUpload(): Promise<string[]> {
 }
 
 /**
- * Creates a ZIP archive in memory from a specific list of relative file paths.
- * It ensures the path structure inside the ZIP matches the input paths.
- *
- * @param relativePaths An array of file paths relative to the project root (e.g., ['src/index.js', 'docs/guide.md']).
- * @param projectRoot The absolute path to the project's root directory, used to find the source files.
- * @returns A Promise that resolves with a Buffer containing the ZIP file data.
+ * Creates a ZIP archive from the given file paths relative to the project root.
+ * @param {string[]} relativePaths - The file paths relative to the project root to include in the ZIP.
+ * @param {string} projectRoot - The root directory of the project.
+ * @returns {Promise<Buffer>} The ZIP archive as a Buffer.
  */
 export async function createZipFromPaths(
   relativePaths: string[],
@@ -90,13 +90,10 @@ export async function createZipFromPaths(
 }
 
 /**
- * Scans a target directory, filters files according to default rules and .gitignore,
- * creates a content-hashed manifest, generates a corresponding ZIP buffer, and
- * returns a list of all files included in the archive.
- *
- * @param projectRoot The absolute path to the project's root directory.
- * @param targetDirectory The specific sub-directory to scan, relative to the project root (e.g., "src", or "." for the whole project).
- * @returns A promise that resolves with an object containing the zipBuffer, the fileManifest, and the list of included file paths.
+ * Creates a ZIP archive and manifest for a project directory, respecting ignore rules and .gitignore.
+ * @param {string} projectRoot - The root directory of the project.
+ * @param {string} targetDirectory - The target directory to scan and archive.
+ * @returns {Promise<{ zipBuffer: Buffer; fileManifest: Record<string, string>; includedFiles: string[] }>} An object containing the ZIP buffer, file manifest, and the list of included files.
  */
 export async function createProjectArchive(
   projectRoot: string,
@@ -104,7 +101,7 @@ export async function createProjectArchive(
 ): Promise<{
   zipBuffer: Buffer;
   fileManifest: Record<string, string>;
-  includedFiles: string[]; // The list of files that were actually processed
+  includedFiles: string[];
 }> {
   const scanRoot = path.join(projectRoot, targetDirectory);
 

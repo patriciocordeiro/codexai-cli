@@ -2,24 +2,30 @@ import fs from 'fs-extra';
 import ora from 'ora';
 import path from 'path';
 import { CONFIG_FILE_PATH } from '../../constants/constants';
-import { CodeAiConfig } from '../../models/config.model';
+import { AnalysisScope, CodeAiConfig } from '../../models/cli.model';
 import { loadProjectConfig } from '../config/config-helpers';
 import { isExcludedPath, isSupportedCodeFile } from '../file/file-helpers';
+import { getChangedFiles } from '../git/git-helpers';
 
+/**
+ * Returns a list of supported code files within the provided paths.
+ * If options.changed is true, only files changed in the current Git working directory are considered.
+ *
+ * @param {Array<string>} paths - Array of file or directory paths to include in the scope.
+ * @param {object} options - Options for file selection. If changed is true, only changed files are included.
+ * @param {boolean} [options.changed] - If true, only changed files are included.
+ * @returns {Array<string>} Array of relative file paths matching supported code file criteria.
+ * @throws {Error} If git command fails or repository is not found when changed is true.
+ */
 export function getFilesForScope(
   paths: string[],
   options: { changed?: boolean }
 ): string[] {
-  console.log('Paths provided for scope:', paths);
   const projectRoot = process.cwd();
   let initialPaths: string[];
   if (options.changed) {
-    const { execSync } = require('child_process');
     try {
-      const output = execSync('git diff --name-only HEAD', {
-        encoding: 'utf-8',
-      }) as string;
-      initialPaths = output.split('\n').filter(f => f.trim().length > 0);
+      initialPaths = getChangedFiles();
     } catch (err) {
       console.error(
         'Failed to get changed files from git. Is this a git repository?',
@@ -32,6 +38,10 @@ export function getFilesForScope(
   }
 
   const files = new Set<string>();
+  /**
+   *
+   * @param currentPath
+   */
   function walk(currentPath: string) {
     const absolutePath = path.resolve(projectRoot, currentPath);
 
@@ -53,7 +63,16 @@ export function getFilesForScope(
   return Array.from(files);
 }
 
-function validatePathsInScope(
+/**
+ * Validates that all file paths are within the project's configured target directory.
+ * Throws an error if any file is outside the target directory.
+ *
+ * @param {Array<string>} targetFilePaths - Array of file paths to validate.
+ * @param {string} targetDirectory - The project's configured target directory.
+ * @param {string} projectRoot - The root directory of the project.
+ * @throws {Error} If any file is outside the target directory.
+ */
+export function validatePathsInScope(
   targetFilePaths: string[],
   targetDirectory: string,
   projectRoot: string
@@ -71,12 +90,40 @@ function validatePathsInScope(
   }
 }
 
-export async function determineAnalysisScope(
-  paths: string[],
-  options: { changed?: boolean },
-  getFilesForScopeImpl: typeof getFilesForScope
-): Promise<{
-  scope: 'ENTIRE_PROJECT' | 'SELECTED_FILES';
+/**
+ * Determines the analysis scope and returns the list of files to analyze.
+ * Uses GIT_DIFF as the default scope, analyzing files changed in git diff if no scope is provided.
+ *
+ * @param {Array<string>} paths - Array of file or directory paths to include in the scope.
+ * @param {string} [scope] - The analysis scope (GIT_DIFF, SELECTED_FILES, ENTIRE_PROJECT).
+ * @param {Function} getFilesForScopeImpl - Implementation for retrieving files for scope.
+ * @param {Function} validatePathsInScopeImpl - Implementation for validating file paths in scope.
+ * @returns {object} Object containing the scope and the list of target file paths to analyze. Properties:
+ *   - scope {string} The analysis scope used.
+ *   - targetFilePaths {Array<string>} The list of file paths to analyze.
+ * @throws {Error} If project configuration fails to load or file validation fails.
+ */
+
+/**
+ *
+ * @param root0
+ * @param root0.paths
+ * @param root0.scope
+ * @param root0.getFilesForScopeImpl
+ * @param root0.validatePathsInScopeImpl
+ */
+export async function determineAnalysisScope({
+  paths,
+  scope = AnalysisScope.GIT_DIFF,
+  getFilesForScopeImpl,
+  validatePathsInScopeImpl,
+}: {
+  paths: string[];
+  scope?: AnalysisScope;
+  getFilesForScopeImpl: typeof getFilesForScope;
+  validatePathsInScopeImpl: typeof validatePathsInScope;
+}): Promise<{
+  scope: AnalysisScope;
   targetFilePaths: string[];
 }> {
   const spinner = ora();
@@ -91,25 +138,42 @@ export async function determineAnalysisScope(
 
   const projectRoot = process.cwd();
   let targetFilePaths: string[];
-  const scope: 'SELECTED_FILES' = 'SELECTED_FILES';
   const getFiles = getFilesForScopeImpl;
 
-  if (options.changed || (paths && paths.length > 0)) {
-    targetFilePaths = getFiles(paths, options);
+  if (!scope || scope === AnalysisScope.GIT_DIFF) {
+    targetFilePaths = getFiles([], { changed: true });
 
+    spinner.info(
+      `Analyzing ${targetFilePaths.length} files changed in git diff...`
+    );
+  } else if (
+    scope === AnalysisScope.SELECTED_FILES &&
+    paths &&
+    paths.length > 0
+  ) {
+    targetFilePaths = getFiles(paths, { changed: false });
     spinner.info(
       `Analyzing ${targetFilePaths.length} files in the specified scope...`
     );
-  } else {
+  } else if (scope === AnalysisScope.ENTIRE_PROJECT) {
     spinner.info(
       `Defaulting to target directory from config: "${config.targetDirectory}"`
     );
-
-    targetFilePaths = getFiles([config.targetDirectory], {});
+    targetFilePaths = getFiles([config.targetDirectory], { changed: false });
+  } else {
+    // fallback: treat as GIT_DIFF
+    targetFilePaths = getFiles([], { changed: true });
+    spinner.info(
+      `Analyzing ${targetFilePaths.length} files changed in git diff...`
+    );
   }
 
   try {
-    validatePathsInScope(targetFilePaths, config.targetDirectory, projectRoot);
+    validatePathsInScopeImpl(
+      targetFilePaths,
+      config.targetDirectory,
+      projectRoot
+    );
   } catch (err) {
     spinner.fail(err instanceof Error ? err.message : String(err));
     throw err;

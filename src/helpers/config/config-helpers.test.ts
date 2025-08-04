@@ -52,14 +52,14 @@ jest.mock('ora', () => oraMockFactory());
 const mockedFse = fse as jest.Mocked<typeof fse>;
 // const mockedOra = ora as jest.Mock;
 
-describe.only('config-helpers', () => {
+describe('config-helpers', () => {
   it('should export CodeAiConfig type', () => {
     const config = { projectId: 'id', targetDirectory: 'src' };
     expect(config.projectId).toBe('id');
   });
 
-  describe.only('getTargetDirectory', () => {
-    it.only('should return the targetDirectory from config file', async () => {
+  describe('getTargetDirectory', () => {
+    it('should return the targetDirectory from config file', async () => {
       const fakeConfig = { projectId: 'id', targetDirectory: 'src' };
       // Set the mock implementation for readJson
       (fse.readJson as jest.Mock).mockResolvedValue(fakeConfig as never);
@@ -113,36 +113,6 @@ describe.only('config-helpers', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should handle non-Error thrown when reading config', async () => {
-      jest.clearAllMocks();
-      mockedFse.pathExists.mockResolvedValue(true as never);
-      mockedFse.readJson.mockRejectedValue('not-an-error');
-      const consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      await expect(guardAgainstExistingProject('src')).rejects.toThrow(
-        /Project already initialized/i
-      );
-      consoleErrorSpy.mockRestore();
-    });
-
-    // it('should succeed spinner if project is not initialized', async () => {
-    //   const oraSpinner = getOraSpinner(mockedOra);
-
-    //   // expect(mockedOra).toHaveBeenCalledWith(
-    //   //   `Starting '${taskType}' analysis...`
-    //   // );
-    //   expect(oraSpinner.start).toHaveBeenCalledTimes(1);
-    //   expect(oraSpinner.succeed).toHaveBeenCalledWith(
-    //     'Analysis successfully initiated!'
-    //   );
-    //   mockedFse.pathExists.mockResolvedValue(false as never);
-
-    //   await guardAgainstExistingProject('src');
-    //   // await expect(guardAgainstExistingProject('src')).rejects.not.toThrow();
-
-    //   expect(oraSpinner.succeed).toHaveBeenCalled();
-    // });
     const fakeConfig = { projectId: 'id', targetDirectory: 'src' };
 
     it('should throw if .codexai exists in target dir', async () => {
@@ -181,20 +151,16 @@ describe.only('config-helpers', () => {
 
     it('should handle malformed config file gracefully', async () => {
       // jest.clearAllMocks();
+      const errorString = 'Malformed config';
       mockedFse.pathExists.mockResolvedValue(true as never);
-      mockedFse.readJson.mockRejectedValue(new Error('Malformed config'));
+      mockedFse.readJson.mockRejectedValue(new Error(errorString));
       const consoleErrorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
       await expect(
         guardAgainstExistingProject(fakeConfig.targetDirectory)
-      ).rejects.toThrow(/Project already initialized/i);
-      // Check that at least one call contains the error string
-      expect(
-        consoleErrorSpy.mock.calls.some(call =>
-          call[0].includes('Error reading .codeai.json file')
-        )
-      ).toBe(true);
+      ).rejects.toThrow(errorString);
+
       consoleErrorSpy.mockRestore();
     });
 

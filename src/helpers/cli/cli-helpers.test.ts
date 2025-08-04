@@ -33,6 +33,10 @@ jest.mock('chalk', () => ({
   },
 }));
 
+jest.mock('../../constants/constants', () => ({
+  FILE_RUN_LIMIT: 200,
+}));
+
 describe('cli-helpers', () => {
   let exitSpy: ReturnType<typeof jest.spyOn>;
   let logSpy: ReturnType<typeof jest.spyOn>;
@@ -117,5 +121,33 @@ describe('cli-helpers', () => {
       'Warning: No results URL provided. Please copy the link above.'
     );
     warnSpy.mockRestore();
+  });
+
+  it('should log an error and throw if executeCommand fails', async () => {
+    jest.resetModules();
+    jest.doMock('os', () => ({
+      platform: () => 'darwin',
+    }));
+    const shellHelpers = await import('../shell/shell-helpers');
+    const execSpy = jest
+      .spyOn(shellHelpers, 'executeCommand')
+      .mockRejectedValue(new Error('Command failed'));
+
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(openBrowser('http://example.com')).rejects.toThrow(
+      'Failed to open browser for URL: http://example.com'
+    );
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Failed to open browser for URL: http://example.com'
+      )
+    );
+
+    execSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 });

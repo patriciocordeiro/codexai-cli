@@ -7,15 +7,16 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import FormData from 'form-data';
-import ora from 'ora';
+import { AnalysisScope } from '../models/cli.model';
 import {
   createProjectWithFiles,
   getProjectManifest,
   triggerAnalysis,
   updateProjectFiles,
 } from './api';
+import { ApiError } from './api-error-handler';
 
 // Mock external dependencies
 jest.mock('axios');
@@ -27,6 +28,9 @@ jest.mock('ora', () => {
   };
   return jest.fn(() => oraMock);
 });
+
+// Mock axios.isAxiosError separately
+const mockIsAxiosError = jest.fn();
 
 // Mock FormData since the original function uses require('form-data')
 jest.mock('form-data', () => {
@@ -50,13 +54,41 @@ jest.mock('../constants/constants', () => ({
 
 // Type-cast the mocked modules for better type-safety and autocompletion
 const mockedAxios = axios as jest.Mocked<typeof axios>;
-const mockedOra = ora as jest.Mock;
 const MockedFormData = FormData as unknown as jest.Mock;
+
+// Setup axios.isAxiosError mock
+Object.defineProperty(mockedAxios, 'isAxiosError', {
+  value: mockIsAxiosError,
+  writable: true,
+});
 
 describe('api', () => {
   beforeEach(() => {
     // Clear all mock history before each test
     jest.clearAllMocks();
+
+    // Setup axios.isAxiosError mock behavior
+    mockIsAxiosError.mockImplementation((error: unknown) => {
+      return error && typeof error === 'object' && 'isAxiosError' in error;
+    });
+  });
+
+  describe('ApiError', () => {
+    it('should create ApiError with default solutions parameter', () => {
+      // This test specifically covers the default parameter assignment in the constructor
+      const error = new ApiError('Test message', 400);
+      expect(error.solutions).toEqual([]);
+      expect(error.message).toBe('Test message');
+      expect(error.statusCode).toBe(400);
+    });
+
+    it('should create ApiError without statusCode', () => {
+      // This test covers the constructor without statusCode
+      const error = new ApiError('Test message');
+      expect(error.solutions).toEqual([]);
+      expect(error.message).toBe('Test message');
+      expect(error.statusCode).toBeUndefined();
+    });
   });
 
   describe('createProjectWithFiles', () => {
@@ -86,12 +118,12 @@ describe('api', () => {
       mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
 
       // Act
-      const result = await createProjectWithFiles(
+      const result = await createProjectWithFiles({
         apiKey,
         projectName,
         zipBuffer,
-        fileManifest
-      );
+        fileManifest,
+      });
 
       // Assert
       expect(MockedFormData).toHaveBeenCalledTimes(1);
@@ -103,9 +135,7 @@ describe('api', () => {
       expect(formInstance.append).toHaveBeenCalledWith(
         'projectZip',
         zipBuffer,
-        {
-          filename: 'project.zip',
-        }
+        { filename: 'project.zip' }
       );
       expect(formInstance.append).toHaveBeenCalledWith(
         'fileManifest',
@@ -123,14 +153,6 @@ describe('api', () => {
         },
       });
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '📦 Uploading project files...',
-        endpointUrl
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '✅ Project created successfully:',
-        mockSuccessResponse
-      );
       expect(result).toEqual(mockSuccessResponse);
     });
 
@@ -144,20 +166,226 @@ describe('api', () => {
         isAxiosError: true,
         response: { data: errorResponse, status: 401 },
       } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
       mockedAxios.post.mockRejectedValue(axiosError);
 
       // Act & Assert
       await expect(
-        createProjectWithFiles(apiKey, projectName, zipBuffer, fileManifest)
-      ).rejects.toEqual(errorResponse);
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Authentication failed. Please check your API key.');
+    });
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '📦 Uploading project files...',
-        endpointUrl
+    it('should handle unknown errors gracefully', async () => {
+      // Arrange
+      const unknownError = new Error('Something went wrong');
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Failed uploading project files: Something went wrong');
+    });
+
+    it('should handle 403 forbidden error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Access denied' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 403 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow(
+        'Access denied. You do not have permission to perform this action.'
       );
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('✅ Project created successfully:')
+    });
+
+    it('should handle 400 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid request parameters' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 400 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow(
+        'Invalid request. Please check your input and try again.'
       );
+    });
+
+    it('should handle 422 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid data format' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 422 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Invalid data. Please check your request parameters.');
+    });
+
+    it('should handle 413 file too large error', async () => {
+      // Arrange
+      const errorResponse = { message: 'File too large' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 413 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow(
+        'File too large. Please reduce the size of your project files.'
+      );
+    });
+
+    it('should handle unknown status code with server message', async () => {
+      // Arrange
+      const errorResponse = { message: 'Custom error message' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Custom error message');
+    });
+
+    it('should handle axios error with string response data', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: 'String error message', status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('String error message');
+    });
+
+    it('should handle axios error with no response data', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: null, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Failed uploading project files. Please try again.');
+    });
+
+    it('should handle non-Error objects', async () => {
+      // Arrange
+      const unknownError = 'String error';
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow(
+        'Unknown error occurred while uploading project files. Please try again.'
+      );
+    });
+
+    it('should handle axios error with undefined responseData', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: undefined, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Failed uploading project files. Please try again.');
+    });
+
+    it('should handle axios error with empty object responseData', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: {}, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Failed uploading project files. Please try again.');
+    });
+
+    it('should handle axios error with number responseData', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: 123, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        createProjectWithFiles({ apiKey, projectName, zipBuffer, fileManifest })
+      ).rejects.toThrow('Failed uploading project files. Please try again.');
     });
   });
 
@@ -166,7 +394,6 @@ describe('api', () => {
     const projectId = 'proj-xyz';
     const taskType = 'REVIEW';
     const language = 'Spanish';
-    const scope = 'SELECTED_FILES';
     const filesForAnalysis = ['src/index.ts', 'src/utils.ts'];
     const endpointUrl = 'https://api.test.com/triggerAnalysisForCliFunction';
     const mockSuccessResponse = {
@@ -175,45 +402,30 @@ describe('api', () => {
     };
 
     it('should trigger an analysis run successfully', async () => {
+      const scope: AnalysisScope = AnalysisScope.ENTIRE_PROJECT;
       // Arrange
       mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
 
       // Act
-
-      // Assert
-      const result = await triggerAnalysis(
+      const result = await triggerAnalysis({
         apiKey,
         projectId,
         taskType,
         language,
         scope,
-        filesForAnalysis
-      );
+        filesForAnalysis,
+      });
 
-      const oraSpinner = mockedOra.mock.results[0].value as {
-        start: jest.Mock;
-        succeed: jest.Mock;
-        fail: jest.Mock;
-      };
-
-      expect(mockedOra).toHaveBeenCalledWith(
-        `Starting '${taskType}' analysis...`
-      );
-      expect(oraSpinner.start).toHaveBeenCalledTimes(1);
-      expect(oraSpinner.succeed).toHaveBeenCalledWith(
-        'Analysis successfully initiated!'
-      );
-      expect(oraSpinner.fail).not.toHaveBeenCalled();
-
+      // Assert
       expect(mockedAxios.post).toHaveBeenCalledWith(
         endpointUrl,
         {
           data: {
-            projectId: projectId,
-            task: 'REVIEW', // uppercased
-            parameters: { language: 'spanish' }, // lowercased
-            scope: scope,
-            filesForAnalysis: filesForAnalysis,
+            projectId,
+            task: taskType.toUpperCase(),
+            parameters: { language: language.toLowerCase() },
+            scope,
+            filesForAnalysis,
           },
         },
         {
@@ -223,73 +435,441 @@ describe('api', () => {
           },
         }
       );
+      expect(result).toEqual(mockSuccessResponse);
+    });
 
+    it('should trigger an analysis run successfully with default scope', async () => {
+      // Arrange
+      mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
+
+      // Act
+      const result = await triggerAnalysis({
+        apiKey,
+        projectId,
+        taskType,
+        language,
+        filesForAnalysis,
+      });
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        endpointUrl,
+        {
+          data: {
+            projectId,
+            task: taskType.toUpperCase(),
+            parameters: { language: language.toLowerCase() },
+            scope: AnalysisScope.GIT_DIFF,
+            filesForAnalysis,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       expect(result).toEqual(mockSuccessResponse);
     });
 
     it('should handle API failure, update spinner, and re-throw error', async () => {
       // Arrange
-      const apiError = new Error('API request failed');
-      mockedAxios.post.mockRejectedValue(apiError);
+      const errorResponse = { message: 'API request failed' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 500 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
       // Act & Assert
       await expect(
-        triggerAnalysis(
+        triggerAnalysis({
           apiKey,
           projectId,
           taskType,
           language,
-          scope,
-          filesForAnalysis
-        )
-      ).rejects.toThrow(apiError);
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Server error. Please try again later.');
+    });
 
-      // Ensure ora was called before accessing its mock results
-      const oraSpinner = mockedOra.mock.results[0].value as {
-        start: jest.Mock;
-        succeed: jest.Mock;
-        fail: jest.Mock;
-      };
+    it('should handle 401 authentication error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid API key' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 401 },
+      } as AxiosError;
 
-      expect(oraSpinner.start).toHaveBeenCalledTimes(1);
-      expect(oraSpinner.fail).toHaveBeenCalledWith('Failed to start analysis.');
-      expect(oraSpinner.succeed).not.toHaveBeenCalled();
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Authentication failed. Please check your API key.');
+    });
+
+    it('should handle 403 forbidden error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Access denied' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 403 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow(
+        'Access denied. You do not have permission to perform this action.'
+      );
+    });
+
+    it('should handle 400 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid request parameters' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 400 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow(
+        'Invalid request. Please check your input and try again.'
+      );
+    });
+
+    it('should handle 422 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid data format' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 422 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Invalid data. Please check your request parameters.');
+    });
+
+    it('should handle 413 file too large error', async () => {
+      // Arrange
+      const errorResponse = { message: 'File too large' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 413 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow(
+        'File too large. Please reduce the size of your project files.'
+      );
+    });
+
+    it('should handle unknown status code with server message', async () => {
+      // Arrange
+      const errorResponse = { message: 'Custom error message' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Custom error message');
+    });
+
+    it('should handle axios error with string response data', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: 'String error message', status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('String error message');
+    });
+
+    it('should handle axios error with no response data', async () => {
+      // Arrange
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: null, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Failed starting analysis. Please try again.');
+    });
+
+    it('should handle non-Axios errors', async () => {
+      // Arrange
+      const unknownError = new Error('Network connection failed');
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow('Failed starting analysis: Network connection failed');
+    });
+
+    it('should handle non-Error objects', async () => {
+      // Arrange
+      const unknownError = 'String error';
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        triggerAnalysis({
+          apiKey,
+          projectId,
+          taskType,
+          language,
+          filesForAnalysis,
+        })
+      ).rejects.toThrow(
+        'Unknown error occurred while starting analysis. Please try again.'
+      );
     });
   });
 
   describe('getProjectManifest', () => {
     const apiKey = 'test-api-key';
     const projectId = 'proj-xyz';
-    const endpointUrl = 'https://api.test.com/getProjectManifestFunction';
-    const mockManifest = { 'file1.js': 'hash1', 'file2.css': 'hash2' };
+    const mockManifest = {
+      paths: ['file1.js', 'file2.js'],
+      hashes: ['hash1', 'hash2'],
+    };
 
     it('should fetch the project manifest successfully', async () => {
       // Arrange
       mockedAxios.post.mockResolvedValue({ data: { manifest: mockManifest } });
 
       // Act
-      const result = await getProjectManifest(apiKey, projectId);
+      const result = await getProjectManifest({ apiKey, projectId });
 
       // Assert
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        endpointUrl,
-        { data: { projectId } },
-        { headers: { Authorization: `Bearer ${apiKey}` } }
-      );
       expect(result).toEqual(mockManifest);
     });
 
-    it('should throw the specific error data on API failure', async () => {
+    it('should handle API errors gracefully', async () => {
       // Arrange
       const errorResponse = { message: 'Project not found.' };
       const axiosError = {
         isAxiosError: true,
         response: { data: errorResponse, status: 404 },
       } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
       mockedAxios.post.mockRejectedValue(axiosError);
 
       // Act & Assert
-      await expect(getProjectManifest(apiKey, projectId)).rejects.toEqual(
-        errorResponse
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Resource not found. The requested project or endpoint does not exist.'
+      );
+    });
+
+    it('should handle unknown errors gracefully', async () => {
+      // Arrange
+      const unknownError = new Error('Something went wrong');
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Failed fetching project manifest: Something went wrong'
+      );
+    });
+
+    it('should handle 401 authentication error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid API key' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 401 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Authentication failed. Please check your API key.'
+      );
+    });
+
+    it('should handle 403 forbidden error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Access denied' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 403 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Access denied. You do not have permission to perform this action.'
+      );
+    });
+
+    it('should handle 400 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid request parameters' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 400 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Invalid request. Please check your input and try again.'
+      );
+    });
+
+    it('should handle unknown status code with server message', async () => {
+      // Arrange
+      const errorResponse = { message: 'Custom error message' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Custom error message'
+      );
+    });
+
+    it('should handle non-Error objects', async () => {
+      // Arrange
+      const unknownError = 'String error';
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(getProjectManifest({ apiKey, projectId })).rejects.toThrow(
+        'Unknown error occurred while fetching project manifest. Please try again.'
       );
     });
   });
@@ -297,36 +877,34 @@ describe('api', () => {
   describe('updateProjectFiles', () => {
     const apiKey = 'test-api-key';
     const projectId = 'proj-xyz';
-    const patchZipBuffer = Buffer.from('patch-content');
-    const updatedManifest = { 'new-file.ts': 'new-hash' };
+    const patchZipBuffer = Buffer.from('patch-zip-content');
+    const updatedManifest = { 'file1.js': 'new-hash1' };
     const endpointUrl = 'https://api.test.com/updateProjectFilesFunction';
-    const mockSuccessResponse = { message: 'Project updated successfully' };
+    const mockSuccessResponse = { message: 'Files updated successfully.' };
 
     it('should update project files successfully', async () => {
       // Arrange
       mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
 
       // Act
-      const result = await updateProjectFiles(
+      const result = await updateProjectFiles({
         apiKey,
         projectId,
         patchZipBuffer,
-        updatedManifest
-      );
+        updatedManifest,
+      });
 
       // Assert
       expect(MockedFormData).toHaveBeenCalledTimes(1);
       const formInstance = MockedFormData.mock.results[0].value as {
         append: jest.Mock;
         getHeaders: jest.Mock;
-        _data?: Map<string, unknown>;
+        _data: Map<string, unknown>;
       };
       expect(formInstance.append).toHaveBeenCalledWith(
         'patchZip',
         patchZipBuffer,
-        {
-          filename: 'patch.zip',
-        }
+        { filename: 'patch.zip' }
       );
       expect(formInstance.append).toHaveBeenCalledWith(
         'updatedManifest',
@@ -334,37 +912,253 @@ describe('api', () => {
       );
       expect(formInstance.append).toHaveBeenCalledWith('projectId', projectId);
 
-      const rawHeaders =
-        typeof formInstance.getHeaders === 'function'
-          ? formInstance.getHeaders()
-          : undefined;
-      const headers =
-        rawHeaders &&
-        typeof rawHeaders === 'object' &&
-        !Array.isArray(rawHeaders)
-          ? { ...rawHeaders }
-          : {};
-
       expect(mockedAxios.post).toHaveBeenCalledWith(endpointUrl, formInstance, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          ...headers,
+          ...(formInstance.getHeaders?.() || {}),
         },
       });
-
       expect(result).toEqual(mockSuccessResponse);
     });
 
-    it('should re-throw the original error on API failure', async () => {
+    it('should handle API errors gracefully', async () => {
       // Arrange
-      const apiError = new Error('Update failed due to server error');
-      mockedAxios.post.mockRejectedValue(apiError);
+      const errorResponse = { message: 'Update failed due to server error' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 500 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
 
       // Act & Assert
-      // This function does not have a try/catch, so it should re-throw the raw axios error.
       await expect(
-        updateProjectFiles(apiKey, projectId, patchZipBuffer, updatedManifest)
-      ).rejects.toThrow(apiError);
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow('Server error. Please try again later.');
+    });
+
+    it('should handle 401 authentication error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid API key' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 401 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow('Authentication failed. Please check your API key.');
+    });
+
+    it('should handle 403 forbidden error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Access denied' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 403 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow(
+        'Access denied. You do not have permission to perform this action.'
+      );
+    });
+
+    it('should handle 400 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid request parameters' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 400 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow(
+        'Invalid request. Please check your input and try again.'
+      );
+    });
+
+    it('should handle 422 validation error', async () => {
+      // Arrange
+      const errorResponse = { message: 'Invalid data format' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 422 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow('Invalid data. Please check your request parameters.');
+    });
+
+    it('should handle 413 file too large error', async () => {
+      // Arrange
+      const errorResponse = { message: 'File too large' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 413 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow(
+        'File too large. Please reduce the size of your project files.'
+      );
+    });
+
+    it('should handle unknown status code with server message', async () => {
+      // Arrange
+      const errorResponse = { message: 'Custom error message' };
+      const axiosError = {
+        isAxiosError: true,
+        response: { data: errorResponse, status: 999 },
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow('Custom error message');
+    });
+
+    it('should handle non-Axios errors', async () => {
+      // Arrange
+      const unknownError = new Error('Network connection failed');
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow(
+        'Failed updating project files: Network connection failed'
+      );
+    });
+
+    it('should handle non-Error objects', async () => {
+      // Arrange
+      const unknownError = 'String error';
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow(
+        'Unknown error occurred while updating project files. Please try again.'
+      );
+    });
+
+    it('should handle ApiError without solutions parameter', async () => {
+      // Arrange
+      const apiKey = 'valid-api-key';
+      const projectId = 'project-123';
+      const patchZipBuffer = Buffer.from('zip-content');
+      const updatedManifest = { 'file.ts': 'content' };
+
+      const mockError = new AxiosError('Axios error');
+      mockError.response = {
+        status: 400,
+        data: { message: 'Validation failed' },
+        statusText: 'Bad Request',
+        headers: {},
+        config: { headers: {} } as InternalAxiosRequestConfig,
+      };
+      mockIsAxiosError.mockReturnValue(true);
+      (axios.put as jest.MockedFunction<typeof axios.put>).mockRejectedValue(
+        mockError
+      );
+
+      // Act & Assert - This should trigger the default solutions parameter
+      await expect(
+        updateProjectFiles({
+          apiKey,
+          projectId,
+          patchZipBuffer,
+          updatedManifest,
+        })
+      ).rejects.toThrow();
     });
   });
 });

@@ -9,6 +9,7 @@ import {
   API_BASE_URL,
   CLI_CONFIG_DIR,
   WEB_APP_URL,
+  WEB_LOGIN_PAGE_LINK,
 } from '../constants/constants';
 import { openBrowser } from '../helpers/cli/cli-helpers';
 
@@ -23,10 +24,12 @@ const CONFIG_PATH = path.join(
   'config.json'
 );
 
-interface Config {
-  apiKey: string;
-}
-
+/**
+ * Saves the provided API key to the local config file.
+ * @param {string} apiKey - The API key to save.
+ * @returns {Promise<void>} Resolves when the API key is saved.
+ * @throws {Error} If saving fails.
+ */
 export async function saveApiKey(apiKey: string): Promise<void> {
   try {
     await fse.ensureDir(path.dirname(CONFIG_PATH));
@@ -39,12 +42,13 @@ export async function saveApiKey(apiKey: string): Promise<void> {
 }
 
 /**
- * Loads the API key from the local config file.
+ * Loads the API key from the local config file, if it exists.
+ * @returns {Promise<string | null>} The API key, or null if not found.
  */
 export async function loadApiKey(): Promise<string | null> {
   try {
     if (await fse.pathExists(CONFIG_PATH)) {
-      const config: Config = await fse.readJson(CONFIG_PATH);
+      const config = await fse.readJson(CONFIG_PATH);
       return config.apiKey;
     }
     return null;
@@ -55,7 +59,8 @@ export async function loadApiKey(): Promise<string | null> {
 }
 
 /**
- * Removes the local config file.
+ * Removes the stored API key from the local config file.
+ * @returns {Promise<void>} Resolves when the API key is removed.
  */
 async function removeApiKey(): Promise<void> {
   try {
@@ -68,16 +73,20 @@ async function removeApiKey(): Promise<void> {
 }
 
 /**
- * Delays execution for a given number of milliseconds.
+ * Delays execution for the specified number of milliseconds.
+ * @param {number} ms - The number of milliseconds to delay.
+ * @returns {Promise<void>} Resolves after the delay.
  */
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Manages the web-based login flow for the CLI.
+ * Initiates the web-based login flow for authentication.
+ * Opens the browser and polls for API key until login is complete or times out.
+ * @returns {Promise<void>} Resolves when login is successful, otherwise throws on timeout.
  */
 export async function webLogin(): Promise<void> {
   const sessionId = uuidv4();
-  const loginUrl = `${WEB_APP_URL}/cli-login?session=${sessionId}`;
+  const loginUrl = `${WEB_APP_URL}/${WEB_LOGIN_PAGE_LINK}?session=${sessionId}`;
 
   console.log(
     chalk.bold('\nTo complete authentication, your browser will now open.')
@@ -99,7 +108,6 @@ export async function webLogin(): Promise<void> {
       )
     );
   }
-  // ---
 
   const spinner = ora('Waiting for you to log in in the browser...').start();
   const maxAttempts = 40;
@@ -130,23 +138,30 @@ export async function webLogin(): Promise<void> {
 }
 
 /**
- * Logs the user out by deleting their stored API key.
+ * Logs out the current user by removing the stored API key.
+ * @returns {Promise<void>} Resolves when the API key is removed.
  */
 export async function logout(): Promise<void> {
   await removeApiKey();
 }
 
 /**
- * Checks if the user is authenticated by loading the API key.
- * If not authenticated, it throws an error.
- * @returns The API key if authenticated.
+ * Checks if the user is authenticated and returns the API key if available.
+ * @param loadApiKey
+ * @param loadApiKeyImpl
+ * @returns {Promise<string>} The API key if authenticated.
+ * @throws {Error} If authentication is required and no API key is found.
  */
-export async function checkAuthentication(): Promise<string> {
-  const apiKey = await loadApiKey();
+export async function checkAuthentication(
+  loadApiKeyImpl: () => Promise<string | null>
+): Promise<string> {
+  const spinner = ora('Checking authentication...').start();
+  const apiKey = await loadApiKeyImpl();
+
   if (!apiKey) {
-    console.error('❌ You must be logged in. Please run `codeai login`.');
+    spinner.fail('❌ You must be logged in. Please run `codeai login`.');
     throw new Error('Authentication required');
   }
-  console.log('✅ Authenticated.');
+  spinner.succeed('You are logged in.');
   return apiKey;
 }

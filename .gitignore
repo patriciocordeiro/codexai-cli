@@ -125,3 +125,4 @@ config.json
 # TypeScript
 *.tsbuildinfo
 .env
+.codeai.json

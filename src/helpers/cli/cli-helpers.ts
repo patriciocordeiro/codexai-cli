@@ -1,8 +1,12 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { FILE_RUN_LIMIT } from '../../constants/constants';
 
-const FILE_RUN_LIMIT = 200;
-
+/**
+ * Confirms with the user if the file count exceeds the recommended limit.
+ * @param {number} fileCount - The number of files to process.
+ * @returns {Promise<void>} Resolves if the user proceeds, otherwise throws an error.
+ */
 export async function confirmFileLimit(fileCount: number): Promise<void> {
   if (fileCount > FILE_RUN_LIMIT) {
     console.log(
@@ -30,16 +34,30 @@ export async function confirmFileLimit(fileCount: number): Promise<void> {
   }
 }
 
+/**
+ * Opens the provided URL in the default browser for the current OS.
+ * @param {string} url - The URL to open.
+ * @returns {Promise<void>} Resolves when the browser is opened or warns if no URL is provided.
+ */
 export async function openBrowser(url: string): Promise<void> {
   const os = await import('os');
   const { executeCommand } = await import('../shell/shell-helpers');
   if (url.length) {
-    if (os.platform() === 'darwin') {
-      await executeCommand(`open ${url}`);
-    } else if (os.platform() === 'win32') {
-      await executeCommand(`start ${url}`);
-    } else {
-      await executeCommand(`xdg-open ${url}`);
+    try {
+      if (os.platform() === 'darwin') {
+        await executeCommand(`open ${url}`);
+      } else if (os.platform() === 'win32') {
+        await executeCommand(`start ${url}`);
+      } else {
+        await executeCommand(`xdg-open ${url}`);
+      }
+    } catch (error) {
+      console.error(
+        chalk.red(
+          `Failed to open browser for URL: ${url}. Error: ${(error as Error).message}`
+        )
+      );
+      throw new Error(`Failed to open browser for URL: ${url}`);
     }
   } else {
     console.warn(
