@@ -225,10 +225,14 @@ export async function saveProjectConfiguration({
 }
 
 /**
- * Displays a success message after project creation and optionally opens the project URL in a browser.
+ * Displays a success message after project creation, including the project URL.
  * @param {string} projectUrl - The URL of the created project.
+ * @param {boolean} isOpenBrowser - Whether to automatically open the browser.
  */
-export function displayProjectCreationSuccessMessage(projectUrl: string): void {
+export function displayProjectCreationSuccessMessage(
+  projectUrl: string,
+  isOpenBrowser?: boolean
+): void {
   console.info(chalk.bold.green('\nProject created and linked successfully!'));
   console.info('To run your first analysis, use the command:');
   console.info(chalk.cyan('  codeai run options'));
@@ -237,13 +241,17 @@ export function displayProjectCreationSuccessMessage(projectUrl: string): void {
     console.info(
       `You can also view your project at: ${chalk.blue.underline(projectUrl)}`
     );
-    openBrowser(projectUrl).catch(() => {
-      console.warn(
-        chalk.yellow(
-          `Could not automatically open browser. Please visit: ${projectUrl}`
-        )
-      );
-    });
+    if (isOpenBrowser) {
+      openBrowser(projectUrl).catch(() => {
+        console.log('Deu erro');
+
+        console.warn(
+          chalk.yellow(
+            `Could not automatically open browser. Please visit: ${projectUrl}`
+          )
+        );
+      });
+    }
   } else {
     console.info(chalk.bold.green(`Visit your project at: ${projectUrl}`));
   }

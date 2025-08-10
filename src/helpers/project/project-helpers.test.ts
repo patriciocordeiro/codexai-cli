@@ -231,6 +231,8 @@ describe('project-helpers', () => {
   });
 
   describe('displayProjectCreationSuccessMessage', () => {
+    // // clear mocks before each test
+
     let logSpy: jest.SpiedFunction<typeof console.info>;
     let warnSpy: jest.SpiedFunction<typeof console.warn>;
 
@@ -247,7 +249,9 @@ describe('project-helpers', () => {
 
     it('should log all messages and open browser in non-production', async () => {
       (openBrowser as jest.Mock).mockResolvedValue(undefined as never);
-      displayProjectCreationSuccessMessage('http://project-url');
+
+      displayProjectCreationSuccessMessage('http://project-url', true);
+
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining('Project created and linked successfully!')
       );
@@ -270,9 +274,8 @@ describe('project-helpers', () => {
         new Error('fail') as never
       );
 
-      await new Promise(resolve => setTimeout(resolve, 0)); // Ensure the catch block is executed
-
-      await displayProjectCreationSuccessMessage('http://project-url');
+      // Call the function and wait for the catch block to execute
+      await displayProjectCreationSuccessMessage('http://project-url', true);
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Could not automatically open browser')

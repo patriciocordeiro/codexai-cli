@@ -13,7 +13,7 @@ module.exports = {
       },
     ],
   },
-  transformIgnorePatterns: ['node_modules/(?!(chalk|open|ora)/)'],
+  transformIgnorePatterns: ['node_modules/(?!(chalk|open|ora|execa)/)'],
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',

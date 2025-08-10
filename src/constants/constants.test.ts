@@ -28,7 +28,7 @@ describe('constants', () => {
   it('uses default values if env vars are not set', () => {
     process.env.CODEAI_WEB_URL = '';
     process.env.CODEAI_API_URL = '';
-    process.env.NODE_ENV = 'test';
+    process.env.NODE_ENV = 'production'; // In production, should be undefined when env vars are empty
     jest.resetModules();
     const { WEB_APP_URL, API_BASE_URL } = require('./constants');
     expect(WEB_APP_URL).toBeFalsy();

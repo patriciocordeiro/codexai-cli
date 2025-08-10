@@ -217,6 +217,7 @@ describe('analysis-helpers', () => {
       language: 'english',
       scope: AnalysisScope.ENTIRE_PROJECT,
       targetFilePaths: [],
+      isOpenBrowser: true,
     };
     const mockApiResponse = { resultsUrl: 'https://results.url/123' };
 

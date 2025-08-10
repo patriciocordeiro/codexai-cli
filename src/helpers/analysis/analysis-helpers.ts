@@ -55,6 +55,35 @@ export function displayNoFilesToAnalyze(): void {
 }
 
 /**
+ * Handles the case when trying to analyze git changes in a non-git repository.
+ * Provides clear guidance on available options.
+ */
+export function handleNonGitRepository(): void {
+  console.error(chalk.red.bold('\n❌ Not a git repository'));
+  console.info(
+    chalk.yellow(
+      'The default analysis uses git diff to find changed files, but this directory is not a git repository.'
+    )
+  );
+  console.info(chalk.bold('\n🔧 Here are your options:'));
+  console.info(chalk.cyan('  1. Initialize a git repository:'));
+  console.info(chalk.gray('     git init'));
+  console.info(chalk.gray('     git add .'));
+  console.info(chalk.gray('     git commit -m "Initial commit"'));
+  console.info(chalk.cyan('\n  2. Analyze the entire project:'));
+  console.info(chalk.gray('     codeai run --all'));
+  console.info(chalk.cyan('\n  3. Analyze specific files or folders:'));
+  console.info(chalk.gray('     codeai run src/'));
+  console.info(chalk.gray('     codeai run src/file.js src/other.ts'));
+  console.info(
+    chalk.dim(
+      '\n💡 Tip: Using git helps track which files have changed for more targeted analysis.'
+    )
+  );
+  process.exit(1);
+}
+
+/**
  * Deploys out-of-sync files if needed before analysis.
  * @param {DeployOutOfSyncFilesParams} params - The parameters object.
  * @returns {Promise<void>}
@@ -78,6 +107,7 @@ export async function triggerAnalysisAndDisplayResults({
   language,
   scope,
   targetFilePaths,
+  isOpenBrowser = false,
 }: TriggerAnalysisAndDisplayResultsParams): Promise<void> {
   const spinner = ora('Sending analysis request to the server...').start();
   const { resultsUrl } = await triggerAnalysis({
@@ -91,7 +121,7 @@ export async function triggerAnalysisAndDisplayResults({
   spinner.succeed('Analysis successfully initiated!');
   console.info('\n✅ View analysis progress and results at:');
   console.info(chalk.blue.underline(resultsUrl));
-  if (!IS_PRODUCTION) {
+  if (!IS_PRODUCTION && isOpenBrowser) {
     openBrowser(resultsUrl);
   }
 }

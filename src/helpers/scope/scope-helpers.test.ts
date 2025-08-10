@@ -2,6 +2,27 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AnalysisScope } from '../../models/cli.model';
 
 // Mock dependencies at the top level
+jest.mock('fs-extra', () => ({
+  pathExists: jest.fn(),
+  readdir: jest.fn(),
+  stat: jest.fn(),
+  readJson: jest.fn(),
+  writeJson: jest.fn(),
+  ensureDir: jest.fn(),
+  copy: jest.fn(),
+  remove: jest.fn(),
+}));
+
+jest.mock('child_process', () => ({
+  execSync: jest.fn(),
+}));
+
+jest.mock('../git/git-helpers', () => ({
+  getChangedFiles: jest.fn(),
+  isGitRepository: jest.fn(),
+  validateGitRepository: jest.fn(),
+}));
+
 jest.mock('ora', () => {
   return () => ({
     start: jest.fn().mockReturnThis(),
@@ -69,6 +90,19 @@ describe('Analysis Scope Helpers', () => {
   beforeEach(() => {
     jest.resetAllMocks();
 
+    // Setup git-helpers mock return values
+    const {
+      getChangedFiles,
+      isGitRepository,
+      validateGitRepository,
+    } = require('../git/git-helpers');
+    getChangedFiles.mockReturnValue([
+      'src/api/api.ts',
+      'src/components/Button.tsx',
+    ]);
+    isGitRepository.mockReturnValue(true);
+    validateGitRepository.mockImplementation(() => {});
+
     // Consistent Mocking for File System and Path
     process.cwd = () => VIRTUAL_PROJECT_ROOT;
 
@@ -128,39 +162,45 @@ describe('Analysis Scope Helpers', () => {
 
     it('should get changed files from git when changed option is used', () => {
       jest.resetModules();
-      const gitDiffOutput =
-        'src/api/api.ts\nsrc/components/Button.tsx\nREADME.md';
-
-      jest.doMock('child_process', () => ({
-        execSync: jest.fn(() => gitDiffOutput),
-      }));
 
       jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: (p: string) => !p.endsWith('README.md'),
+        isSupportedCodeFile: (p: string) =>
+          p.endsWith('.ts') || p.endsWith('.tsx') || p.endsWith('.js'),
         isExcludedPath: () => false,
       }));
 
+      const { getFilesForScope } = require('./scope-helpers');
       const fse = require('fs-extra');
+      const path = require('path');
+
       fse.existsSync.mockImplementation((p: string) => {
         const files = [
           'src/api/api.ts',
           'src/components/Button.tsx',
           'README.md',
         ];
-        return files.some(f => p === f || p.endsWith('/' + f));
+        return files.some(
+          f =>
+            p === f ||
+            p.endsWith('/' + f) ||
+            p.endsWith(f.replace(/\//g, path.sep))
+        );
       });
       fse.statSync.mockImplementation(() => ({
         isDirectory: () => false,
       }));
 
-      const { getFilesForScope } = require('./scope-helpers');
-      const { execSync } = require('child_process');
+      // Setup git-helpers mock to return the expected files
+      const { getChangedFiles } = require('../git/git-helpers');
+      getChangedFiles.mockReturnValue([
+        'src/api/api.ts',
+        'src/components/Button.tsx',
+        'README.md',
+      ]);
 
       const result = getFilesForScope([], { changed: true });
 
-      expect(execSync).toHaveBeenCalledWith('git diff --name-only', {
-        encoding: 'utf-8',
-      });
+      expect(getChangedFiles).toHaveBeenCalled();
       expect(result).toHaveLength(2);
       expect(result).toContain('src/api/api.ts');
       expect(result).toContain('src/components/Button.tsx');
@@ -180,23 +220,22 @@ describe('Analysis Scope Helpers', () => {
     });
 
     it('should handle git error gracefully', () => {
-      jest.resetModules();
-
-      jest.doMock('child_process', () => ({
-        execSync: jest.fn(() => {
-          throw new Error('Not a git repository');
-        }),
-      }));
-
       jest.doMock('../file/file-helpers', () => ({
         isSupportedCodeFile: () => true,
         isExcludedPath: () => false,
       }));
 
+      // Setup git-helpers mock to throw an error
+      const { getChangedFiles } = require('../git/git-helpers');
+      getChangedFiles.mockImplementation(() => {
+        throw new Error('Not a git repository');
+      });
+
       const { getFilesForScope } = require('./scope-helpers');
 
-      const result = getFilesForScope([], { changed: true });
-      expect(result).toEqual([]);
+      expect(() => {
+        getFilesForScope([], { changed: true });
+      }).toThrow('Failed to get changed files from git.');
     });
   });
 

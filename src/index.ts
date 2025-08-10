@@ -32,9 +32,11 @@ program
 program
   .command('login')
   .description('Authenticate via your web browser.')
-  .action(async () => {
+  .option('--no-browser', 'Do not open browser automatically')
+  .action(async options => {
     try {
-      await webLogin();
+      const isOpenBrowser = !options.noBrowser;
+      await webLogin(isOpenBrowser);
     } catch (error) {
       console.error(chalk.red.bold('\nAuthentication failed.', error));
       process.exit(1);

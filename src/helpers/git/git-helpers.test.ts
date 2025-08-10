@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { getChangedFiles } from './git-helpers';
-// Import the function to test
+import {
+  getChangedFiles,
+  isGitRepository,
+  validateGitRepository,
+} from './git-helpers';
 
 // Mock the child_process module
 jest.mock('child_process');
@@ -14,7 +17,8 @@ const { execSync } = require('child_process');
 describe('getChangedFiles', () => {
   // Clear mocks before each test
   beforeEach(() => {
-    // jest.clearAllMocks();
+    jest.clearAllMocks();
+    execSync.mockReset();
   });
 
   // --- Test Case 1: Standard git output ---
@@ -61,30 +65,7 @@ describe('getChangedFiles', () => {
     expect(files).toEqual(['src/components/Button.tsx', 'src/api/api.ts']);
   });
 
-  // --- Test Case 4: Command fails (e.g., not a git repository) ---
-  it('should return an empty array and log an error if execSync throws', () => {
-    const mockError = new Error('fatal: not a git repository');
-
-    // Configure the mock to throw an error when called
-    execSync.mockImplementation(() => {
-      throw mockError;
-    });
-
-    const files = getChangedFiles();
-
-    // Assertions
-    expect(files).toBeInstanceOf(Array);
-    expect(files).toHaveLength(0);
-
-    // Verify that console.error was called with the expected messages
-    expect(console.error).toHaveBeenCalledTimes(1);
-    expect(console.error).toHaveBeenCalledWith(
-      'Failed to get changed files from git. Is this a git repository?',
-      mockError
-    );
-  });
-
-  // --- Test Case 5: No changed files ---
+  // --- Test Case 4: No changed files ---
   it('should return an empty array when the git command returns an empty string', () => {
     const gitOutput = '';
     execSync.mockReturnValue(gitOutput);
@@ -92,5 +73,102 @@ describe('getChangedFiles', () => {
     const files = getChangedFiles();
 
     expect(files).toHaveLength(0);
+  });
+
+  // --- Test Case 6: Staged, unstaged, and untracked files combined ---
+  it('should combine staged, unstaged, and untracked files and deduplicate', () => {
+    // Simulate three calls: staged, unstaged, untracked
+    execSync
+      .mockReturnValueOnce('file1.js\nfile2.js') // staged
+      .mockReturnValueOnce('file2.js\nfile3.js') // unstaged
+      .mockReturnValueOnce('file4.js\nfile1.js'); // untracked
+    const files = getChangedFiles();
+    expect(files.sort()).toEqual(
+      ['file1.js', 'file2.js', 'file3.js', 'file4.js'].sort()
+    );
+    // Should call all three commands
+    expect(execSync).toHaveBeenCalledWith(
+      'git diff --cached --name-only',
+      expect.anything()
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'git diff --name-only',
+      expect.anything()
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'git ls-files --others --exclude-standard',
+      expect.anything()
+    );
+  });
+
+  // --- Test Case 7: Fallback to branch diff if no files found ---
+  it('should use branch diff if no staged/unstaged/untracked files', () => {
+    // All three return empty, then branch fallback
+    execSync
+      .mockReturnValueOnce('') // staged
+      .mockReturnValueOnce('') // unstaged
+      .mockReturnValueOnce('') // untracked
+      .mockImplementationOnce(() => {
+        throw new Error('no origin/main');
+      }) // origin/main
+      .mockImplementationOnce(() => ''); // main exists
+    execSync.mockReturnValueOnce('branch1.js\nbranch2.js'); // branch diff
+    const files = getChangedFiles();
+    expect(files).toEqual(['branch1.js', 'branch2.js']);
+  });
+
+  // --- Test Case 7: All commands fail scenario ---
+  it('should return empty array if all git commands fail', () => {
+    execSync.mockImplementation(() => {
+      throw new Error('git command failed');
+    });
+    const files = getChangedFiles();
+    expect(files).toEqual([]);
+  });
+});
+
+describe('isGitRepository', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns true if .git exists', () => {
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(true);
+    expect(isGitRepository('/fake/dir')).toBe(true);
+  });
+
+  it('returns true if git command succeeds', () => {
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(false);
+    execSync.mockImplementationOnce(() => {});
+    expect(isGitRepository('/fake/dir')).toBe(true);
+  });
+
+  it('returns false if neither .git nor git command', () => {
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(false);
+    execSync.mockImplementationOnce(() => {
+      throw new Error('fail');
+    });
+    expect(isGitRepository('/fake/dir')).toBe(false);
+  });
+});
+
+describe('validateGitRepository', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('does not throw if isGitRepository returns true', () => {
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(true);
+    expect(() => validateGitRepository('/fake/dir')).not.toThrow();
+  });
+
+  it('throws if isGitRepository returns false', () => {
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(false);
+    execSync.mockImplementationOnce(() => {
+      throw new Error('fail');
+    });
+    expect(() => validateGitRepository('/fake/dir')).toThrow(
+      /not a git repository/
+    );
   });
 });

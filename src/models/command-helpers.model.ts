@@ -3,7 +3,7 @@
  */
 export interface ProgramCreateProjectParams {
   targetDirectoryArg: string;
-  options: { name?: string };
+  options: { name?: string; isOpenBrowser?: boolean };
 }
 
 /**
@@ -15,5 +15,8 @@ export interface RunAnalysisParams {
   options: {
     scope?: import('./cli.model').AnalysisScope;
     language?: string;
+    changed?: boolean;
+    all?: boolean;
+    openBrowser?: boolean;
   };
 }

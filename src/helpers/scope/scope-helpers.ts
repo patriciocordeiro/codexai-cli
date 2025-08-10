@@ -111,6 +111,7 @@ export function validatePathsInScope(
  * @param root0.scope
  * @param root0.getFilesForScopeImpl
  * @param root0.validatePathsInScopeImpl
+ * @returns {Promise<{ scope: AnalysisScope; targetFilePaths: string[] }>} An object containing the analysis scope and the list of target file paths to analyze.
  */
 export async function determineAnalysisScope({
   paths,

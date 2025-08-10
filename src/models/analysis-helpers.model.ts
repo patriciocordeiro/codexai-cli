@@ -24,4 +24,5 @@ export interface TriggerAnalysisAndDisplayResultsParams {
   language: string;
   scope: import('./cli.model').AnalysisScope;
   targetFilePaths: string[];
+  isOpenBrowser?: boolean;
 }

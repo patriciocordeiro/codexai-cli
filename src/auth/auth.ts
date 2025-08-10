@@ -82,9 +82,10 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Initiates the web-based login flow for authentication.
  * Opens the browser and polls for API key until login is complete or times out.
+ * @param {boolean} [isOpenBrowser] - Whether to automatically open the browser
  * @returns {Promise<void>} Resolves when login is successful, otherwise throws on timeout.
  */
-export async function webLogin(): Promise<void> {
+export async function webLogin(isOpenBrowser?: boolean): Promise<void> {
   const sessionId = uuidv4();
   const loginUrl = `${WEB_APP_URL}/${WEB_LOGIN_PAGE_LINK}?session=${sessionId}`;
 
@@ -98,15 +99,17 @@ export async function webLogin(): Promise<void> {
   // Use chalk to style the link, making it easy to see and copy
   console.info(chalk.cyan.underline(loginUrl));
 
-  // --- Automatically open the browser ---
-  try {
-    await openBrowser(loginUrl);
-  } catch {
-    console.warn(
-      chalk.yellow(
-        'Warning: Could not automatically open the browser. Please copy the link above.'
-      )
-    );
+  // --- Automatically open the browser (only if isOpenBrowser is true) ---
+  if (isOpenBrowser) {
+    try {
+      await openBrowser(loginUrl);
+    } catch {
+      console.warn(
+        chalk.yellow(
+          'Warning: Could not automatically open the browser. Please copy the link above.'
+        )
+      );
+    }
   }
 
   const spinner = ora('Waiting for you to log in in the browser...').start();
@@ -147,8 +150,7 @@ export async function logout(): Promise<void> {
 
 /**
  * Checks if the user is authenticated and returns the API key if available.
- * @param loadApiKey
- * @param loadApiKeyImpl
+ * @param {() => Promise<string | null>} loadApiKeyImpl - Function to load the API key
  * @returns {Promise<string>} The API key if authenticated.
  * @throws {Error} If authentication is required and no API key is found.
  */

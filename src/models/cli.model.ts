@@ -45,6 +45,9 @@ export interface RunAnalysisParams {
   options: {
     language?: string;
     scope?: AnalysisScope;
+    all?: boolean;
+    changed?: boolean;
+    openBrowser?: boolean;
   };
 }
 
