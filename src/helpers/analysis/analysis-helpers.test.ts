@@ -271,6 +271,51 @@ describe('analysis-helpers', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(mockApiResponse.resultsUrl);
       expect(openBrowser).not.toHaveBeenCalled();
     });
+
+    it('should not open browser when isOpenBrowser is false even in non-production', async () => {
+      // Arrange
+      (constants.IS_PRODUCTION as boolean) = false;
+      (triggerAnalysis as jest.Mock).mockResolvedValue(
+        mockApiResponse as never
+      );
+
+      const paramsWithoutBrowser: TriggerAnalysisAndDisplayResultsParams = {
+        ...params,
+        isOpenBrowser: false,
+      };
+
+      // Act
+      await triggerAnalysisAndDisplayResults(paramsWithoutBrowser);
+
+      // Assert
+      expect(consoleLogSpy).toHaveBeenCalledWith(mockApiResponse.resultsUrl);
+      expect(openBrowser).not.toHaveBeenCalled();
+    });
+
+    it('should use default isOpenBrowser value (false) when not specified', async () => {
+      // Arrange
+      (constants.IS_PRODUCTION as boolean) = false;
+      (triggerAnalysis as jest.Mock).mockResolvedValue(
+        mockApiResponse as never
+      );
+
+      const paramsWithoutOpenBrowser = {
+        apiKey: 'api-key-abc',
+        projectId: 'proj-123',
+        task: 'REVIEW',
+        language: 'english',
+        scope: AnalysisScope.ENTIRE_PROJECT,
+        targetFilePaths: [],
+        // Note: isOpenBrowser is not specified, so it should use the default value (false)
+      };
+
+      // Act
+      await triggerAnalysisAndDisplayResults(paramsWithoutOpenBrowser);
+
+      // Assert
+      expect(consoleLogSpy).toHaveBeenCalledWith(mockApiResponse.resultsUrl);
+      expect(openBrowser).not.toHaveBeenCalled(); // Should not open browser since default is false
+    });
   });
 
   describe('handleAnalysisError', () => {

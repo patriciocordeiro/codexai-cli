@@ -15,6 +15,71 @@ jest.spyOn(console, 'error').mockImplementation(() => {});
 const { execSync } = require('child_process');
 
 describe('getChangedFiles', () => {
+  it('should use last commit diff if all other git commands fail', () => {
+    // Simulate all other git commands returning empty or throwing, except for last commit diff
+    let callCount = 0;
+    execSync.mockImplementation((cmd: string, _options?: never) => {
+      callCount++;
+
+      // First three calls return empty to trigger fallback logic
+      if (
+        cmd === 'git diff --cached --name-only' ||
+        cmd === 'git diff --name-only' ||
+        cmd === 'git ls-files --others --exclude-standard'
+      ) {
+        return '';
+      }
+
+      // Branch verification commands fail
+      if (cmd.startsWith('git rev-parse --verify')) {
+        throw new Error('fail');
+      }
+
+      // Branch diff commands fail
+      if (cmd.includes('...HEAD --name-only')) {
+        throw new Error('fail');
+      }
+
+      // Fallback command succeeds
+      if (cmd === 'git diff HEAD~1 --name-only') {
+        return 'file1.txt\nfile2.js\n';
+      }
+
+      throw new Error('unexpected command: ' + cmd);
+    });
+
+    const files = getChangedFiles();
+    expect(files).toContain('file1.txt');
+    expect(files).toContain('file2.js');
+    expect(files.length).toBe(2);
+    expect(callCount).toBeGreaterThan(1);
+  });
+
+  it('should handle errors and log to console.error', () => {
+    // Save original Set constructor
+    const OriginalSet = global.Set;
+
+    // Mock Set constructor to throw an error to trigger outer catch block
+    global.Set = jest.fn().mockImplementation(() => {
+      throw new Error('Set constructor error');
+    }) as never;
+
+    const consoleSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const files = getChangedFiles();
+
+    expect(files).toEqual([]);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to get changed files from git. Is this a git repository?',
+      expect.any(Error)
+    );
+
+    // Restore original Set and console
+    global.Set = OriginalSet;
+    consoleSpy.mockRestore();
+  });
   // Clear mocks before each test
   beforeEach(() => {
     jest.clearAllMocks();
@@ -150,6 +215,18 @@ describe('isGitRepository', () => {
     });
     expect(isGitRepository('/fake/dir')).toBe(false);
   });
+
+  it('should use current working directory when no dir parameter provided', () => {
+    // Mock process.cwd to cover line 12
+    const originalCwd = process.cwd;
+    process.cwd = jest.fn().mockReturnValue('/current/working/dir') as never;
+
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(true);
+    expect(isGitRepository()).toBe(true);
+
+    // Restore original cwd
+    process.cwd = originalCwd;
+  });
 });
 
 describe('validateGitRepository', () => {
@@ -170,5 +247,24 @@ describe('validateGitRepository', () => {
     expect(() => validateGitRepository('/fake/dir')).toThrow(
       /not a git repository/
     );
+  });
+
+  it('should use current working directory when no dir parameter provided', () => {
+    // Mock process.cwd to cover line 39
+    const originalCwd = process.cwd;
+    process.cwd = jest
+      .fn()
+      .mockReturnValue('/current/working/dir') as () => string;
+
+    jest.spyOn(require('fs-extra'), 'existsSync').mockReturnValueOnce(false);
+    execSync.mockImplementationOnce(() => {
+      throw new Error('fail');
+    });
+
+    expect(() => validateGitRepository()).toThrow(/not a git repository/);
+    expect(() => validateGitRepository()).toThrow(/current\/working\/dir/);
+
+    // Restore original cwd
+    process.cwd = originalCwd;
   });
 });

@@ -104,6 +104,7 @@ export function getChangedFiles(): string[] {
         // Try to find the default branch (main, master, develop)
         const branches = ['main', 'master', 'develop'];
         let baseBranch = '';
+        let branchFound = false;
 
         for (const branch of branches) {
           try {
@@ -111,11 +112,13 @@ export function getChangedFiles(): string[] {
               stdio: 'ignore',
             });
             baseBranch = `origin/${branch}`;
+            branchFound = true;
             break;
           } catch {
             try {
               execSync(`git rev-parse --verify ${branch}`, { stdio: 'ignore' });
               baseBranch = branch;
+              branchFound = true;
               break;
             } catch {
               // Continue to next branch
@@ -123,7 +126,7 @@ export function getChangedFiles(): string[] {
           }
         }
 
-        if (baseBranch) {
+        if (branchFound && baseBranch) {
           const branchOutput = execSync(
             `git diff ${baseBranch}...HEAD --name-only`,
             { encoding: 'utf-8' }
@@ -136,7 +139,11 @@ export function getChangedFiles(): string[] {
           );
         }
       } catch {
-        // If all else fails, get all files modified in the last commit
+        // Branch diff failed, will try fallback below
+      }
+
+      // If still no files after branch detection, try fallback to last commit
+      if (allFiles.size === 0) {
         try {
           const lastCommitOutput = execSync('git diff HEAD~1 --name-only', {
             encoding: 'utf-8',
