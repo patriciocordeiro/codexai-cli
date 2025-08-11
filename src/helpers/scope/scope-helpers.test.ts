@@ -1,9 +1,21 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { AnalysisScope } from '../../models/cli.model';
 
 // Mock dependencies at the top level
 jest.mock('fs-extra', () => ({
-  pathExists: jest.fn(),
+  // Methods used by scope-helpers
+  existsSync: jest.fn(),
+  statSync: jest.fn(),
+  readdirSync: jest.fn(),
+  // Methods used by other parts
+  pathExists: jest.fn(() => Promise.resolve(true)),
   readdir: jest.fn(),
   stat: jest.fn(),
   readJson: jest.fn(),
@@ -11,6 +23,8 @@ jest.mock('fs-extra', () => ({
   ensureDir: jest.fn(),
   copy: jest.fn(),
   remove: jest.fn(),
+  readFileSync: jest.fn(),
+  writeFileSync: jest.fn(),
 }));
 
 jest.mock('child_process', () => ({
@@ -49,15 +63,6 @@ jest.mock('../../constants/constants', () => ({
 
 jest.mock('dotenv', () => ({ config: jest.fn() }));
 
-jest.mock('fs-extra', () => ({
-  existsSync: jest.fn(),
-  statSync: jest.fn(),
-  readdirSync: jest.fn(),
-  readFileSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  pathExists: jest.fn(() => Promise.resolve(true)),
-}));
-
 jest.mock('chalk', () => ({
   __esModule: true,
   default: {
@@ -67,13 +72,19 @@ jest.mock('chalk', () => ({
   },
 }));
 
-jest.mock('../file/file-helpers');
+jest.mock('../file/file-helpers', () => ({
+  isSupportedCodeFile: jest.fn(),
+  isExcludedPath: jest.fn(),
+  loadCodeAiConfigFile: jest.fn(),
+  createCodeAiConfigFile: jest.fn(),
+  writeCodeAiConfigFile: jest.fn(),
+}));
 jest.mock('../config/config-helpers', () => ({
   loadProjectConfig: jest.fn(),
   getTargetDirectory: jest.fn(),
 }));
 
-const fse = require('fs-extra');
+const fs = require('fs-extra');
 const path = require('path');
 
 describe('Analysis Scope Helpers', () => {
@@ -89,6 +100,7 @@ describe('Analysis Scope Helpers', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.resetModules();
 
     // Setup git-helpers mock return values
     const {
@@ -107,29 +119,59 @@ describe('Analysis Scope Helpers', () => {
     process.cwd = () => VIRTUAL_PROJECT_ROOT;
 
     jest.spyOn(path, 'resolve').mockImplementation((...args: unknown[]) => {
-      return path.join(...(args as string[]));
+      if (args.length === 1) return args[0] as string;
+      return path.posix.join(...(args as string[]));
     });
 
-    fse.existsSync.mockImplementation(
-      (p: string) =>
+    fs.existsSync.mockImplementation((p: string) => {
+      const exists =
         !!virtualFileSystem[p] ||
-        Object.values(virtualFileSystem).flat().includes(path.basename(p))
-    );
-    fse.statSync.mockImplementation((p: string) => ({
+        Object.values(virtualFileSystem).flat().includes(path.basename(p));
+      console.log(`existsSync(${p}) -> ${exists}`);
+      console.log('Available paths:', Object.keys(virtualFileSystem));
+      return exists;
+    });
+    fs.statSync.mockImplementation((p: string) => ({
       isDirectory: () => !!virtualFileSystem[p],
     }));
-    fse.readdirSync.mockImplementation(
+    fs.readdirSync.mockImplementation(
       (p: string) => virtualFileSystem[p] || []
     );
   });
 
+  afterEach(() => {
+    jest.resetAllMocks();
+    jest.resetModules();
+    jest.restoreAllMocks();
+  });
+
   describe('getFilesForScope', () => {
     it('should walk a directory and return only supported files, respecting nesting', () => {
-      jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: (p: string) =>
-          p.endsWith('.js') || p.endsWith('.ts'),
-        isExcludedPath: () => false,
+      // Setup file-helpers mock for this test
+      const {
+        isSupportedCodeFile,
+        isExcludedPath,
+      } = require('../file/file-helpers');
+      isSupportedCodeFile.mockImplementation(
+        (p: string) => p.endsWith('.js') || p.endsWith('.ts')
+      );
+      isExcludedPath.mockReturnValue(false);
+
+      // Setup fs-extra mocks directly
+      const fs = require('fs-extra');
+      fs.existsSync.mockImplementation((p: string) => {
+        return (
+          !!virtualFileSystem[p] ||
+          Object.values(virtualFileSystem).flat().includes(path.basename(p))
+        );
+      });
+      fs.statSync.mockImplementation((p: string) => ({
+        isDirectory: () => !!virtualFileSystem[p],
       }));
+      fs.readdirSync.mockImplementation(
+        (p: string) => virtualFileSystem[p] || []
+      );
+
       const { getFilesForScope } = require('./scope-helpers');
 
       const result = getFilesForScope(['src'], {});
@@ -146,10 +188,33 @@ describe('Analysis Scope Helpers', () => {
     });
 
     it('should exclude specified paths like node_modules', () => {
-      jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: () => true,
-        isExcludedPath: (p: string) => p.includes('node_modules'),
+      // Setup file-helpers mock
+      const {
+        isSupportedCodeFile,
+        isExcludedPath,
+      } = require('../file/file-helpers');
+      isSupportedCodeFile.mockImplementation(
+        (p: string) => p.endsWith('.js') || p.endsWith('.ts')
+      );
+      isExcludedPath.mockImplementation((p: string) =>
+        p.includes('node_modules')
+      );
+
+      // Setup fs-extra mocks directly
+      const fs = require('fs-extra');
+      fs.existsSync.mockImplementation((p: string) => {
+        return (
+          !!virtualFileSystem[p] ||
+          Object.values(virtualFileSystem).flat().includes(path.basename(p))
+        );
+      });
+      fs.statSync.mockImplementation((p: string) => ({
+        isDirectory: () => !!virtualFileSystem[p],
       }));
+      fs.readdirSync.mockImplementation(
+        (p: string) => virtualFileSystem[p] || []
+      );
+
       const { getFilesForScope } = require('./scope-helpers');
 
       const result = getFilesForScope(['.'], {});
@@ -157,23 +222,25 @@ describe('Analysis Scope Helpers', () => {
       expect(
         result.some((p: string | string[]) => p.includes('node_modules'))
       ).toBe(false);
-      expect(result).toHaveLength(3);
+      expect(result).toHaveLength(3); // src/index.js, src/components/Button.ts, src/components/Card.js
     });
 
     it('should get changed files from git when changed option is used', () => {
-      jest.resetModules();
+      const {
+        isSupportedCodeFile,
+        isExcludedPath,
+      } = require('../file/file-helpers');
+      isSupportedCodeFile.mockImplementation(
+        (p: string) =>
+          p.endsWith('.ts') || p.endsWith('.tsx') || p.endsWith('.js')
+      );
+      isExcludedPath.mockReturnValue(false);
 
-      jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: (p: string) =>
-          p.endsWith('.ts') || p.endsWith('.tsx') || p.endsWith('.js'),
-        isExcludedPath: () => false,
-      }));
-
-      const { getFilesForScope } = require('./scope-helpers');
-      const fse = require('fs-extra');
+      // Override the file system mocks for this specific test
+      const fs = require('fs-extra');
       const path = require('path');
 
-      fse.existsSync.mockImplementation((p: string) => {
+      fs.existsSync.mockImplementation((p: string) => {
         const files = [
           'src/api/api.ts',
           'src/components/Button.tsx',
@@ -186,7 +253,7 @@ describe('Analysis Scope Helpers', () => {
             p.endsWith(f.replace(/\//g, path.sep))
         );
       });
-      fse.statSync.mockImplementation(() => ({
+      fs.statSync.mockImplementation(() => ({
         isDirectory: () => false,
       }));
 
@@ -198,6 +265,7 @@ describe('Analysis Scope Helpers', () => {
         'README.md',
       ]);
 
+      const { getFilesForScope } = require('./scope-helpers');
       const result = getFilesForScope([], { changed: true });
 
       expect(getChangedFiles).toHaveBeenCalled();
@@ -207,11 +275,15 @@ describe('Analysis Scope Helpers', () => {
     });
 
     it('should handle empty paths array', () => {
-      jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: (p: string) =>
-          p.endsWith('.js') || p.endsWith('.ts'),
-        isExcludedPath: () => false,
-      }));
+      const {
+        isSupportedCodeFile,
+        isExcludedPath,
+      } = require('../file/file-helpers');
+      isSupportedCodeFile.mockImplementation(
+        (p: string) => p.endsWith('.js') || p.endsWith('.ts')
+      );
+      isExcludedPath.mockReturnValue(false);
+
       const { getFilesForScope } = require('./scope-helpers');
 
       const result = getFilesForScope([], {});
@@ -220,10 +292,12 @@ describe('Analysis Scope Helpers', () => {
     });
 
     it('should handle git error gracefully', () => {
-      jest.doMock('../file/file-helpers', () => ({
-        isSupportedCodeFile: () => true,
-        isExcludedPath: () => false,
-      }));
+      const {
+        isSupportedCodeFile,
+        isExcludedPath,
+      } = require('../file/file-helpers');
+      isSupportedCodeFile.mockReturnValue(true);
+      isExcludedPath.mockReturnValue(false);
 
       // Setup git-helpers mock to throw an error
       const { getChangedFiles } = require('../git/git-helpers');
@@ -421,6 +495,58 @@ describe('Analysis Scope Helpers', () => {
           validatePathsInScopeImpl: validateMock,
         })
       ).rejects.toThrow('Config not found');
+    });
+
+    it('should analyze files changed in git diff when scope is GIT_DIFF', async () => {
+      // Arrange
+      const { loadProjectConfig } = require('../config/config-helpers');
+      loadProjectConfig.mockResolvedValue({
+        projectId: 'proj-123',
+        targetDirectory: 'src',
+      });
+
+      const scopeHelpers = require('./scope-helpers');
+      const getFilesMock = jest
+        .fn()
+        .mockReturnValue(['src/api/api.ts', 'src/components/Button.tsx']);
+      const validateMock = jest.fn();
+
+      // Act
+      const result = await scopeHelpers.determineAnalysisScope({
+        paths: [],
+        scope: AnalysisScope.GIT_DIFF,
+        getFilesForScopeImpl: getFilesMock,
+        validatePathsInScopeImpl: validateMock,
+      });
+
+      // Assert
+      expect(getFilesMock).toHaveBeenCalledWith([], { changed: true });
+      expect(result.targetFilePaths).toEqual([
+        'src/api/api.ts',
+        'src/components/Button.tsx',
+      ]);
+      expect(result.scope).toBe(AnalysisScope.GIT_DIFF);
+    });
+
+    it('should throw error for unsupported analysis scope', async () => {
+      const { loadProjectConfig } = require('../config/config-helpers');
+      loadProjectConfig.mockResolvedValue({
+        projectId: 'proj-123',
+        targetDirectory: 'src',
+      });
+
+      const scopeHelpers = require('./scope-helpers');
+      const getFilesMock = jest.fn();
+      const validateMock = jest.fn();
+
+      await expect(
+        scopeHelpers.determineAnalysisScope({
+          paths: [],
+          scope: 'INVALID_SCOPE' as AnalysisScope,
+          getFilesForScopeImpl: getFilesMock,
+          validatePathsInScopeImpl: validateMock,
+        })
+      ).rejects.toThrow('Unsupported analysis scope: INVALID_SCOPE');
     });
   });
 });

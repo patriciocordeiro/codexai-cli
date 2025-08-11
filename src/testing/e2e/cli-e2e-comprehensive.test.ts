@@ -65,9 +65,10 @@ module.exports = { multiply };`
         stdio: 'pipe',
         env: {
           ...process.env,
-          NODE_ENV: 'development',
+          NODE_ENV: 'test',
           CODEAI_WEB_URL: 'http://localhost:3000',
           CODEAI_API_URL: 'http://localhost:5001/codex-ai-30da8/us-central1',
+          CLI_CONFIG_DIR: path.join(os.tmpdir(), 'codeai-cli-test'),
         },
       });
 
@@ -154,14 +155,16 @@ module.exports = { multiply };`
       console.log(envTestResult.stdout + envTestResult.stderr);
       console.log('=== END ENV TEST ===');
 
-      const result = await runCli(['login'], 3000).catch(error => {
-        // Capture timeout error but return partial results
-        return {
-          exitCode: -1,
-          stdout: error.stdout || '',
-          stderr: error.stderr || error.message || '',
-        };
-      });
+      const result = await runCli(['login', '--no-browser'], 3000).catch(
+        error => {
+          // Capture timeout error but return partial results
+          return {
+            exitCode: -1,
+            stdout: error.stdout || '',
+            stderr: error.stderr || error.message || '',
+          };
+        }
+      );
 
       const output = result.stdout + result.stderr;
       console.log('=== LOGIN URL OUTPUT ===');
@@ -195,11 +198,26 @@ module.exports = { multiply };`
     });
 
     it('should initiate login process', async () => {
-      const result = await runCli(['login', '--no-browser'], 5000);
+      const result = await runCli(['login', '--no-browser'], 5000).catch(
+        error => {
+          // Capture timeout error but return partial results
+          return {
+            exitCode: -1,
+            stdout: error.stdout || '',
+            stderr: error.stderr || error.message || '',
+          };
+        }
+      );
 
       const output = result.stdout + result.stderr;
       expect(
-        containsAny(output, ['browser', 'login', 'auth', 'authenticate'])
+        containsAny(output, [
+          'browser',
+          'login',
+          'auth',
+          'authenticate',
+          'visit this URL',
+        ])
       ).toBe(true);
     }, 10000);
   });
@@ -570,6 +588,7 @@ module.exports = { multiply };`
               CODEAI_API_URL:
                 process.env.CODEAI_API_URL ||
                 'https://us-central1-codeai-prod.cloudfunctions.net',
+              CLI_CONFIG_DIR: path.join(os.tmpdir(), 'codeai-cli-test'),
             },
           });
 

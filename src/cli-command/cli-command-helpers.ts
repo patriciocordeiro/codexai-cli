@@ -187,11 +187,9 @@ export async function runAnalysis({
     } else if (wantsChangedFiles || defaultBehavior) {
       // Both --changed flag and default behavior use git diff
       analysisScope = AnalysisScope.GIT_DIFF;
-    } else if (hasSpecificPaths) {
-      analysisScope = AnalysisScope.SELECTED_FILES;
     } else {
-      // This shouldn't happen, but fallback to git diff
-      analysisScope = AnalysisScope.GIT_DIFF;
+      // hasSpecificPaths must be true if we reach here
+      analysisScope = AnalysisScope.SELECTED_FILES;
     }
 
     // 3. Determine and VALIDATE the scope of files for this run.

@@ -32,6 +32,7 @@ import {
   displayNoFilesToAnalyze,
   getAnalysisScope,
   handleAnalysisError,
+  handleNonGitRepository,
   setupAnalysisContext,
   triggerAnalysisAndDisplayResults,
 } from './analysis-helpers';
@@ -70,6 +71,9 @@ jest.mock('../cli/cli-helpers', () => ({
 jest.mock('chalk', () => ({
   bold: jest.fn(msg => msg),
   yellow: jest.fn(msg => msg),
+  cyan: jest.fn(msg => msg),
+  gray: jest.fn(msg => msg),
+  dim: jest.fn(msg => msg),
   blue: {
     underline: jest.fn(msg => msg),
   },
@@ -279,7 +283,7 @@ describe('analysis-helpers', () => {
           status: 404,
           statusText: 'Not Found',
           headers: {},
-          config: {} as any,
+          config: {} as NonNullable<AxiosError['config']>,
         },
       };
 
@@ -302,7 +306,7 @@ describe('analysis-helpers', () => {
           status: 400,
           statusText: 'Bad Request',
           headers: {},
-          config: {} as any,
+          config: {} as NonNullable<AxiosError['config']>,
         },
       };
 
@@ -348,6 +352,57 @@ describe('analysis-helpers', () => {
         error
       );
       expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('handleNonGitRepository', () => {
+    it('should display error messages and exit the process', () => {
+      // Act & Assert
+      expect(() => handleNonGitRepository()).toThrow(
+        'process.exit() was called.'
+      );
+
+      // Verify error message
+      expect(consoleErrorSpy).toHaveBeenCalledWith('\n❌ Not a git repository');
+
+      // Verify informational messages
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'The default analysis uses git diff to find changed files, but this directory is not a git repository.'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('\n🔧 Here are your options:');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '  1. Initialize a git repository:'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('     git init');
+      expect(consoleLogSpy).toHaveBeenCalledWith('     git add .');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '     git commit -m "Initial commit"'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '\n  2. Analyze the entire project:'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('     codeai run --all');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '\n  3. Analyze specific files or folders:'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith('     codeai run src/');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '     codeai run src/file.js src/other.ts'
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '\n💡 Tip: Using git helps track which files have changed for more targeted analysis.'
+      );
+
+      // Verify process exit
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      // Verify chalk methods were called
+      expect(chalk.red.bold).toHaveBeenCalled();
+      expect(chalk.yellow).toHaveBeenCalled();
+      expect(chalk.bold).toHaveBeenCalled();
+      expect(chalk.cyan).toHaveBeenCalled();
+      expect(chalk.gray).toHaveBeenCalled();
+      expect(chalk.dim).toHaveBeenCalled();
     });
   });
 });

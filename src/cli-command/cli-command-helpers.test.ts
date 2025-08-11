@@ -36,6 +36,7 @@ import {
   setupDeploymentContext,
   uploadPatch,
 } from '../helpers/deploy/deploy-helpers';
+import { isGitRepository } from '../helpers/git/git-helpers';
 import {
   createRemoteProject,
   displayProjectCreationSuccessMessage,
@@ -63,7 +64,9 @@ jest.mock('../helpers/git/git-helpers', () => ({
 jest.mock('chalk', () => ({
   yellow: jest.fn(msg => msg),
   green: jest.fn(msg => msg),
-  red: jest.fn(msg => msg),
+  red: {
+    bold: jest.fn(msg => msg),
+  },
   blue: {
     bold: jest.fn(msg => msg),
   },
@@ -94,6 +97,7 @@ const mockedUploadPatch = uploadPatch as jest.Mock;
 
 const mockedSetupAnalysisContext = setupAnalysisContext as jest.Mock;
 const mockedGetAnalysisScope = getAnalysisScope as jest.Mock;
+const mockedIsGitRepository = isGitRepository as jest.Mock;
 
 // --- Test Suite ---
 describe('command-helpers', () => {
@@ -370,6 +374,157 @@ describe('command-helpers', () => {
       // Assert
       expect(handleAnalysisError).toHaveBeenCalledWith(error);
       expect(getAnalysisScope).not.toHaveBeenCalled();
+    });
+
+    it('should display error and exit if --changed is used in a non-git directory', async () => {
+      // Arrange
+      mockedIsGitRepository.mockReturnValue(false);
+      const consoleErrorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const consoleInfoSpy = jest
+        .spyOn(console, 'info')
+        .mockImplementation(() => {});
+      const processExitSpy = jest
+        .spyOn(process, 'exit')
+        .mockImplementation(() => {
+          throw new Error('process.exit called');
+        });
+
+      // Act
+      await runAnalysis({
+        task: 'REVIEW',
+        paths: [],
+        options: { changed: true },
+      });
+
+      // Assert that process.exit was called
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Cannot analyze changed files')
+      );
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'The --changed option requires a git repository'
+        )
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      // Cleanup
+      consoleErrorSpy.mockRestore();
+      consoleInfoSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
+
+    it('should handle default behavior and exit if not in a git repository', async () => {
+      // Arrange
+      mockedIsGitRepository.mockReturnValue(false);
+      const handleNonGitRepositorySpy = jest
+        .spyOn(
+          require('../helpers/analysis/analysis-helpers'),
+          'handleNonGitRepository'
+        )
+        .mockImplementation(() => {});
+
+      // Act
+      await runAnalysis({
+        task: 'REVIEW',
+        paths: [],
+        options: {},
+      });
+
+      // Assert
+      expect(handleNonGitRepositorySpy).toHaveBeenCalled();
+
+      // Cleanup
+      handleNonGitRepositorySpy.mockRestore();
+    });
+
+    it('should set analysisScope to GIT_DIFF for --changed flag in git repository', async () => {
+      // Arrange
+      mockedIsGitRepository.mockReturnValue(true);
+      mockedSetupAnalysisContext.mockResolvedValue({
+        projectId: 'proj-abc',
+        apiKey: 'api-key-123',
+      } as never);
+      mockedGetAnalysisScope.mockResolvedValue({
+        scope: AnalysisScope.GIT_DIFF,
+        targetFilePaths: ['file1.ts', 'file2.ts'],
+      } as never);
+      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
+      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
+        undefined as never
+      );
+
+      // Act
+      await runAnalysis({
+        task: 'REVIEW',
+        paths: [],
+        options: { changed: true },
+      });
+
+      // Assert
+      expect(getAnalysisScope).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: AnalysisScope.GIT_DIFF })
+      );
+    });
+
+    it('should set analysisScope to GIT_DIFF for default behavior in git repository', async () => {
+      // Arrange
+      mockedIsGitRepository.mockReturnValue(true);
+      mockedSetupAnalysisContext.mockResolvedValue({
+        projectId: 'proj-abc',
+        apiKey: 'api-key-123',
+      } as never);
+      mockedGetAnalysisScope.mockResolvedValue({
+        scope: AnalysisScope.GIT_DIFF,
+        targetFilePaths: ['file1.ts', 'file2.ts'],
+      } as never);
+      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
+      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
+        undefined as never
+      );
+
+      // Act - default behavior: no paths, no --all, no --changed
+      await runAnalysis({
+        task: 'REVIEW',
+        paths: [],
+        options: {}, // no flags
+      });
+
+      // Assert
+      expect(getAnalysisScope).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: AnalysisScope.GIT_DIFF })
+      );
+    });
+
+    it('should set analysisScope to SELECTED_FILES when specific paths are provided', async () => {
+      // Arrange
+      mockedIsGitRepository.mockReturnValue(true);
+      mockedSetupAnalysisContext.mockResolvedValue({
+        projectId: 'proj-abc',
+        apiKey: 'api-key-123',
+      } as never);
+      mockedGetAnalysisScope.mockResolvedValue({
+        scope: AnalysisScope.SELECTED_FILES,
+        targetFilePaths: ['file1.ts'],
+      } as never);
+      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
+      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
+        undefined as never
+      );
+
+      // Act
+      await runAnalysis({
+        task: 'REVIEW',
+        paths: ['file1.ts'],
+        options: {},
+      });
+
+      // Assert
+      expect(getAnalysisScope).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: AnalysisScope.SELECTED_FILES })
+      );
     });
   });
 });

@@ -25,7 +25,7 @@ export function getFilesForScope(
   let initialPaths: string[];
   if (options.changed) {
     try {
-      initialPaths = getChangedFiles();
+      initialPaths = getChangedFiles() || [];
     } catch (err) {
       console.error(
         'Failed to get changed files from git. Is this a git repository?',
@@ -47,6 +47,7 @@ export function getFilesForScope(
 
     if (isExcludedPath(absolutePath)) return;
     if (!fs.existsSync(absolutePath)) return;
+
     const stat = fs.statSync(absolutePath);
     if (stat.isDirectory()) {
       for (const entry of fs.readdirSync(absolutePath)) {
@@ -141,7 +142,7 @@ export async function determineAnalysisScope({
   let targetFilePaths: string[];
   const getFiles = getFilesForScopeImpl;
 
-  if (!scope || scope === AnalysisScope.GIT_DIFF) {
+  if (scope === AnalysisScope.GIT_DIFF) {
     targetFilePaths = getFiles([], { changed: true });
 
     spinner.info(
@@ -162,11 +163,7 @@ export async function determineAnalysisScope({
     );
     targetFilePaths = getFiles([config.targetDirectory], { changed: false });
   } else {
-    // fallback: treat as GIT_DIFF
-    targetFilePaths = getFiles([], { changed: true });
-    spinner.info(
-      `Analyzing ${targetFilePaths.length} files changed in git diff...`
-    );
+    throw new Error(`Unsupported analysis scope: ${scope}`);
   }
 
   try {

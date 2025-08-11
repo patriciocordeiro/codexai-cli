@@ -35,8 +35,7 @@ program
   .option('--no-browser', 'Do not open browser automatically')
   .action(async options => {
     try {
-      const isOpenBrowser = !options.noBrowser;
-      await webLogin(isOpenBrowser);
+      await webLogin(options.browser);
     } catch (error) {
       console.error(chalk.red.bold('\nAuthentication failed.', error));
       process.exit(1);
