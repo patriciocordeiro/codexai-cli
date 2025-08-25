@@ -44,27 +44,43 @@ codeai --help
    - Deletes the locally stored API key
    - Signs you out of the CLI
 
-3. **`codeai analyze <paths...>`** - Upload and analyze code
-   - Compresses specified files/folders into a ZIP
-   - Uploads to CodeAI API for analysis
-   - Supports project naming and task types
-   - Opens results in browser when complete
+3. **`codeai create [path]`** - Initialize a new CodeAI project
+   - Creates project configuration in current directory
+   - Uploads initial codebase to CodeAI platform
+   - Sets up target directory for analysis
 
-### Analyze Command Options
+4. **`codeai deploy`** - Deploy file changes to your linked project
+   - Syncs local changes with remote CodeAI project
+   - Prepares codebase for analysis
+
+5. **`codeai run [task] [paths...]`** - Run analysis on your project
+   - Executes AI-powered code analysis
+   - Supports multiple analysis methods and tasks
+   - Interactive prompts for missing parameters
+   - Automatic authentication and project setup
+
+### Run Command Options
 
 ```bash
-codeai analyze [options] <paths...>
+codeai run [task] [paths...] [options]
 
 Arguments:
-  paths                 Files or folders to analyze (required)
+  task                  Analysis task type (if not provided, you'll be prompted)
+  paths                 Files or folders to analyze (optional)
 
 Options:
-  -p, --project <name>  Assign a name to this analysis project
-  -t, --task <type>     Analysis task type (default: "REVIEW")
-  -h, --help           Show help for analyze command
+  --method <method>     Analysis method: "git-diff", "entire-project", or "selected-files"
+                        (if not provided, defaults to git-diff for git repos or prompts)
+  -l, --language <lang> Language for analysis results (default: "en")
+  -h, --help           Show help for run command
 ```
 
-**Supported Task Types:** REVIEW, UNIT_TESTS (and any other types supported by your CodeAI API)
+**Analysis Methods:**
+- **git-diff**: Analyze only files changed in git repository
+- **entire-project**: Analyze all files in the project
+- **selected-files**: Analyze specific files or folders
+
+**Supported Task Types:** REVIEW, SECURITY, PERFORMANCE, DOCUMENTATION, TESTING
 
 ## Installation & Setup
 
@@ -87,29 +103,61 @@ Source code is available for licensed partners. Contact support@codeai.com for a
 
 ### Basic Workflow
 ```bash
-# 1. Login first
+# 1. Login first (will be prompted if not already logged in)
 codeai login
 
-# 2. Analyze current directory  
-codeai analyze .
+# 2. Create a new project (will be prompted if not already created)
+codeai create
 
-# 3. Analyze specific files
-codeai analyze src/ package.json
+# 3. Run analysis - simple command with interactive prompts
+codeai run
 
-# 4. Analyze with project name
-codeai analyze . --project "My Project"
+# 4. Run analysis with specific parameters
+codeai run REVIEW --method git-diff
 
-# 5. Analyze with specific task
-codeai analyze . --task UNIT_TESTS
+# 5. Run analysis on specific files
+codeai run SECURITY src/ lib/
 
-# 6. Logout when done
+# 6. Run analysis on entire project
+codeai run PERFORMANCE --method entire-project
+
+# 7. Deploy changes and run analysis
+codeai deploy
+codeai run
+
+# 8. Logout when done
 codeai logout
+```
+
+### Interactive Experience
+The CLI now provides an interactive experience:
+- **Automatic Authentication**: If you're not logged in, you'll be prompted to log in
+- **Automatic Project Setup**: If no project exists, you'll be prompted to create one
+- **Method Selection**: If no method is specified, you'll see options to choose from
+- **Task Selection**: If no task is specified, you'll see available analysis types
+- **Smart Defaults**: Git repositories default to git-diff analysis
+
+### Advanced Usage
+```bash
+# Specify everything explicitly
+codeai run REVIEW src/ --method selected-files --language es
+
+# Use git-diff method (default for git repos)
+codeai run SECURITY --method git-diff
+
+# Analyze entire codebase
+codeai run DOCUMENTATION --method entire-project
+
+# Quick analysis with prompts for missing info
+codeai run
 ```
 
 ### Check Available Commands
 ```bash
 codeai --help
-codeai analyze --help
+codeai run --help
+codeai create --help
+codeai deploy --help
 ```
 
 ## How It Works

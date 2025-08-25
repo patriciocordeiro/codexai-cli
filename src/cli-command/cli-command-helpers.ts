@@ -1,11 +1,11 @@
 import chalk from 'chalk';
 import ora from 'ora';
+import { webLogin } from '../auth/auth';
 import {
   deployOutOfSyncFiles,
   displayNoFilesToAnalyze,
   getAnalysisScope,
   handleAnalysisError,
-  handleNonGitRepository,
   setupAnalysisContext,
   triggerAnalysisAndDisplayResults,
 } from '../helpers/analysis/analysis-helpers';
@@ -28,6 +28,13 @@ import {
   saveProjectConfiguration,
   setupProjectParameters,
 } from '../helpers/project/project-helpers';
+import {
+  promptForAnalysisMethod,
+  promptForAnalysisTask,
+  promptForLogin,
+  promptForProjectCreation,
+  promptForSelectedPaths,
+} from '../helpers/prompts/prompt-helpers';
 import { AnalysisScope } from '../models/cli.model';
 import {
   ProgramCreateProjectParams,
@@ -130,7 +137,7 @@ export async function programDeploy(): Promise<void> {
  * @param {RunAnalysisParams} params - The parameters object.
  * @param {string} params.task - The analysis task to run.
  * @param {string[]} params.paths - The file paths to analyze.
- * @param {{ scope?: AnalysisScope; language?: string }} params.options - Options for analysis, including scope and language.
+ * @param {{ method?: string; language?: string; all?: boolean; openBrowser?: boolean }} params.options - Options for analysis.
  * @returns {Promise<void>} Resolves when analysis is complete.
  */
 export async function runAnalysis({
@@ -139,90 +146,246 @@ export async function runAnalysis({
   options,
 }: RunAnalysisParams): Promise<void> {
   try {
-    // Check git repository requirements
-    const isGitRepo = isGitRepository();
+    // Detect non-interactive/CI environments where prompts should not be used.
+    // Use CI env var or absence of a TTY for child processes.
 
-    // Determine what the user wants to analyze
-    const hasSpecificPaths = paths.length > 0;
-    const wantsEntireProject = options.all;
-    const wantsChangedFiles = options.changed;
-    const defaultBehavior =
-      !hasSpecificPaths && !wantsEntireProject && !wantsChangedFiles;
+    const nonInteractive = Boolean(process.env.CI) || !process.stdin.isTTY;
 
-    // Default behavior (no paths, no --all, no --changed) requires git
-    if (defaultBehavior && !isGitRepo) {
-      handleNonGitRepository();
-      return;
-    }
-
-    // Also check if --changed is explicitly requested but no git repo
-    if (wantsChangedFiles && !isGitRepo) {
-      console.error(chalk.red.bold('\n❌ Cannot analyze changed files'));
-      console.info(
-        chalk.yellow(
-          'The --changed option requires a git repository, but this directory is not one.'
+    // Early check: in non-interactive/CI environments require task to be provided
+    if (!task && nonInteractive) {
+      console.error(
+        chalk.red.bold(
+          '\n❌ Analysis task not provided and CLI is running in non-interactive mode. Please specify a task (e.g., REVIEW) with `--task` or as a positional argument.'
         )
       );
-      console.info(chalk.bold('\n🔧 Your options:'));
-      console.info(chalk.cyan('  1. Initialize a git repository:'));
-      console.info(
-        chalk.gray(
-          '     git init && git add . && git commit -m "Initial commit"'
-        )
-      );
-      console.info(chalk.cyan('\n  2. Analyze the entire project instead:'));
-      console.info(chalk.gray('     codeai run --all'));
-      console.info(chalk.cyan('\n  3. Analyze specific files or folders:'));
-      console.info(chalk.gray('     codeai run src/'));
       process.exit(1);
     }
 
-    // 1. Load project and authenticate
-    const { projectId, apiKey } = await setupAnalysisContext();
+    // 1. Handle authentication - check if user is logged in, if not prompt to login
+    let apiKey: string;
+    let projectId: string;
 
-    // 2. Determine scope based on user input
-    let analysisScope: AnalysisScope;
-    if (wantsEntireProject) {
-      analysisScope = AnalysisScope.ENTIRE_PROJECT;
-    } else if (wantsChangedFiles || defaultBehavior) {
-      // Both --changed flag and default behavior use git diff
-      analysisScope = AnalysisScope.GIT_DIFF;
-    } else {
-      // hasSpecificPaths must be true if we reach here
-      analysisScope = AnalysisScope.SELECTED_FILES;
+    try {
+      const context = await setupAnalysisContext();
+      apiKey = context.apiKey;
+      projectId = context.projectId;
+    } catch (error) {
+      // Check if it's an authentication error
+      if (
+        error instanceof Error &&
+        error.message === 'Authentication required'
+      ) {
+        if (nonInteractive) {
+          console.error(
+            chalk.red.bold(
+              '\n❌ Authentication required but CLI is running in non-interactive/CI mode. Please provide valid authentication before running analysis.'
+            )
+          );
+          process.exit(1);
+        }
+
+        const shouldLogin = await promptForLogin();
+        if (!shouldLogin) {
+          console.info(chalk.yellow('Analysis cancelled.'));
+          process.exit(0);
+        }
+
+        // Start login process
+        await webLogin(true);
+
+        // Try to get context again after login
+        try {
+          const context = await setupAnalysisContext();
+          apiKey = context.apiKey;
+          projectId = context.projectId;
+        } catch (projectError) {
+          // If still failing, it might be a project configuration issue
+          if (
+            projectError instanceof Error &&
+            projectError.message.includes('.codeai.json')
+          ) {
+            if (nonInteractive) {
+              console.error(
+                chalk.red(
+                  '\n❌ Project configuration not found and CLI is running in non-interactive/CI mode. Please create a project before running analysis.'
+                )
+              );
+              process.exit(1);
+            }
+
+            const shouldCreateProject = await promptForProjectCreation();
+            if (!shouldCreateProject) {
+              console.info(chalk.yellow('Analysis cancelled.'));
+              process.exit(0);
+            }
+
+            // Start project creation process
+            await programCreateProject({
+              targetDirectoryArg: '',
+              options: {},
+            });
+
+            // Try to get context one more time
+            const finalContext = await setupAnalysisContext();
+            apiKey = finalContext.apiKey;
+            projectId = finalContext.projectId;
+          } else {
+            throw projectError;
+          }
+        }
+      } else if (
+        error instanceof Error &&
+        error.message.includes('.codeai.json')
+      ) {
+        // Project configuration not found
+        if (nonInteractive) {
+          console.error(
+            chalk.red(
+              '\n❌ Project configuration not found and CLI is running in non-interactive/CI mode. Please create a project before running analysis.'
+            )
+          );
+          process.exit(1);
+        }
+
+        const shouldCreateProject = await promptForProjectCreation();
+        if (!shouldCreateProject) {
+          console.info(chalk.yellow('Analysis cancelled.'));
+          process.exit(0);
+        }
+
+        // Start project creation process
+        await programCreateProject({
+          targetDirectoryArg: '',
+          options: {},
+        });
+
+        // Try to get context after project creation
+        const context = await setupAnalysisContext();
+        apiKey = context.apiKey;
+        projectId = context.projectId;
+      } else {
+        throw error;
+      }
     }
 
-    // 3. Determine and VALIDATE the scope of files for this run.
+    // 2. Handle task selection - if no task provided, prompt user to select
+    let selectedTask = task;
+    if (!selectedTask) {
+      if (nonInteractive) {
+        console.error(
+          chalk.red.bold(
+            '\n❌ Analysis task not provided and CLI is running in non-interactive mode. Please specify a task (e.g., REVIEW) with `--task` or as a positional argument.'
+          )
+        );
+        process.exit(1);
+      }
+
+      selectedTask = await promptForAnalysisTask();
+    }
+
+    // 3. Check git repository status for method determination
+    const isGitRepo = isGitRepository();
+
+    // 4. Determine analysis method and scope
+    let analysisScope: AnalysisScope;
+    let targetPaths = paths;
+
+    // Handle method selection
+    if (options.method) {
+      // Method explicitly provided via --method
+      switch (options.method.toLowerCase()) {
+        case 'git-diff':
+          if (!isGitRepo) {
+            console.error(chalk.red.bold('\n❌ Cannot use git-diff method'));
+            console.info(
+              chalk.yellow('This directory is not a git repository.')
+            );
+            console.info(chalk.bold('\n🔧 Your options:'));
+            console.info(chalk.cyan('  1. Initialize a git repository:'));
+            console.info(
+              chalk.gray(
+                '     git init && git add . && git commit -m "Initial commit"'
+              )
+            );
+            console.info(chalk.cyan('\n  2. Use a different method:'));
+            console.info(chalk.gray('     codeai run --method entire-project'));
+            console.info(chalk.gray('     codeai run --method selected-files'));
+            process.exit(1);
+          }
+          analysisScope = AnalysisScope.GIT_DIFF;
+          break;
+        case 'entire-project':
+          analysisScope = AnalysisScope.ENTIRE_PROJECT;
+          break;
+        case 'selected-files':
+          analysisScope = AnalysisScope.SELECTED_FILES;
+          if (targetPaths.length === 0) {
+            targetPaths = await promptForSelectedPaths();
+          }
+          break;
+        default:
+          console.error(
+            chalk.red.bold(`\n❌ Invalid method: ${options.method}`)
+          );
+          console.info(
+            chalk.yellow(
+              'Valid methods are: git-diff, entire-project, selected-files'
+            )
+          );
+          process.exit(1);
+      }
+    } else if (targetPaths.length > 0) {
+      // Specific paths provided
+      analysisScope = AnalysisScope.SELECTED_FILES;
+    } else if (options.all) {
+      // --all flag provided
+      analysisScope = AnalysisScope.ENTIRE_PROJECT;
+    } else {
+      // No method specified, no paths, no --all flag
+      if (isGitRepo) {
+        // Default to git-diff for git repositories
+        analysisScope = AnalysisScope.GIT_DIFF;
+      } else {
+        // Not a git repo, show options and let user choose
+        console.info(chalk.yellow.bold('\n⚠️  Not a Git Repository'));
+        console.info(
+          chalk.yellow(
+            'This directory is not a git repository, so git-diff analysis is not available.'
+          )
+        );
+        analysisScope = await promptForAnalysisMethod(isGitRepo);
+
+        if (analysisScope === AnalysisScope.SELECTED_FILES) {
+          targetPaths = await promptForSelectedPaths();
+        }
+      }
+    }
+
+    // 5. Get analysis scope and validate files
     const { scope, targetFilePaths } = await getAnalysisScope({
-      paths,
+      paths: targetPaths,
       scope: analysisScope,
     });
 
-    // If scope analysis resulted in no files (e.g., no git changes), exit.
-    if (
-      (scope === AnalysisScope.SELECTED_FILES &&
-        targetFilePaths.length === 0) ||
-      (scope === AnalysisScope.GIT_DIFF && targetFilePaths.length === 0)
-    ) {
+    // If scope analysis resulted in no files, exit
+    if (targetFilePaths.length === 0) {
       displayNoFilesToAnalyze();
       return;
     }
 
-    // 3. Check for and deploy any out-of-sync files to update project context.
+    // 6. Deploy any out-of-sync files to update project context
     await deployOutOfSyncFiles({ apiKey, projectId });
 
-    // 4. Trigger the analysis with the determined scope and display results.
-    // console log the analysis scope and target file paths
-    console.info(chalk.blue.bold(`\n🔍 Running analysis with scope: ${scope}`)); // Log the analysis scope
+    // 7. Trigger the analysis and display results
+    console.info(chalk.blue.bold(`\n🔍 Running analysis with scope: ${scope}`));
     logTargetFiles(targetFilePaths);
-    console.info(
-      chalk.blue.bold(`Task: ${task || 'REVIEW'}`) // Log the task
-    );
-    console.info(chalk.blue.bold(`Language: ${options.language || 'en'}`)); // Log the language
+    console.info(chalk.blue.bold(`Task: ${selectedTask}`));
+    console.info(chalk.blue.bold(`Language: ${options.language || 'en'}`));
+
     await triggerAnalysisAndDisplayResults({
       apiKey,
       projectId,
-      task,
+      task: selectedTask,
       language: options.language || 'en',
       scope: scope as AnalysisScope,
       targetFilePaths,
@@ -234,8 +397,8 @@ export async function runAnalysis({
 }
 
 /**
- *
- * @param targetFilePaths
+ * Logs the target files for analysis
+ * @param {string[]} targetFilePaths - Array of file paths to log
  */
 function logTargetFiles(targetFilePaths: string[]) {
   console.info(

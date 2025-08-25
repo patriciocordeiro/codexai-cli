@@ -15,7 +15,7 @@ export interface RunAnalysisParams {
   options: {
     scope?: import('./cli.model').AnalysisScope;
     language?: string;
-    changed?: boolean;
+    method?: string;
     all?: boolean;
     openBrowser?: boolean;
   };

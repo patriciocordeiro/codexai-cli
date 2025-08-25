@@ -64,7 +64,7 @@ program
     'Override the project name (from package.json or current folder name)'
   )
   .action(async (targetDirectoryArg, options) => {
-    programCreateProject({ targetDirectoryArg, options });
+    await programCreateProject({ targetDirectoryArg, options });
   });
 
 program
@@ -79,14 +79,21 @@ program
   .description(
     'Run a new analysis on the linked project after deploying any local changes.'
   )
-  .argument('<task>', 'The analysis task to run (e.g., REVIEW)')
+  .argument(
+    '[task]',
+    'The analysis task to run (if not provided, you will be prompted to select)'
+  )
   .argument(
     '[paths...]',
     'Optional: Specific files or folders to analyze. If omitted, uses the target directory from .codeai.json.'
   )
   .option(
-    '-c, --changed',
-    'Analyze only the files changed in your local git repository.'
+    '--method <method>',
+    'Analysis method: "git-diff", "entire-project", or "selected-files". If not provided, defaults to git-diff for git repositories or prompts for selection.'
+  )
+  .option(
+    '-t, --task <task>',
+    'Specify analysis task (e.g., REVIEW, SECURITY). Useful for CI/pipelines where positional args are inconvenient.'
   )
   .option(
     '-l, --language <lang>',
@@ -94,7 +101,9 @@ program
     'en'
   )
   .action(async (task, paths, options) => {
-    await runAnalysis({ task, paths, options });
+    const finalTask = options.task || task;
+    const finalPaths: string[] = Array.isArray(paths) ? paths : [];
+    await runAnalysis({ task: finalTask, paths: finalPaths, options });
   });
 
 // Only run the CLI if this file is being executed directly, not when imported for testing
