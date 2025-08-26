@@ -43,9 +43,25 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+          always-auth: true
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          # increase npm fetch retries and backoff to reduce E429 failures
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 2000
+          # prefer offline/cached install and retry on failure
+          npm ci --prefer-offline --no-audit || (
+            echo "First install failed; retrying with exponential backoff..."
+            n=0
+            until [ $n -ge 4 ]; do
+              sleep $((2 ** n))
+              npm ci --prefer-offline --no-audit && break
+              n=$((n + 1))
+            done
+          )
 
       - name: Run type checking
         run: npm run type-check
