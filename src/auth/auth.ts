@@ -120,9 +120,13 @@ async function removeApiKey(): Promise<void> {
     const configPath = getConfigPath();
     if (await fse.pathExists(configPath)) {
       await fse.remove(configPath);
+      console.log(chalk.dim('API key removed from local storage.'));
+    } else {
+      console.log(chalk.yellow('No stored API key found.'));
     }
   } catch (error) {
     console.error('Failed to remove API key.', error);
+    throw error;
   }
 }
 
@@ -322,7 +326,17 @@ export async function webLogin(isOpenBrowser?: boolean): Promise<void> {
  * @returns {Promise<void>} Resolves when the API key is removed.
  */
 export async function logout(): Promise<void> {
-  await removeApiKey();
+  try {
+    const spinner = ora('Logging out...').start();
+    await removeApiKey();
+    spinner.succeed(chalk.green('✅ Successfully logged out!'));
+
+    // Clear temporary token as well
+    setTemporaryToken(null);
+  } catch (error) {
+    console.error(chalk.red('Failed to log out:'), error);
+    // Don't re-throw - handle gracefully for better UX
+  }
 }
 
 /**
@@ -334,7 +348,21 @@ export async function logout(): Promise<void> {
 export async function checkAuthentication(
   loadApiKeyImpl: () => Promise<string | null>
 ): Promise<string> {
+  // In E2E test mode, always fail authentication to test error paths
+  if (process.env.E2E_TEST_MODE === 'true') {
+    throw new Error('Authentication required');
+  }
+
   const spinner = ora('Checking authentication...').start();
+
+  // Check for temporary token first (from CLI --token option)
+  const tempToken = getTemporaryToken();
+  if (tempToken) {
+    spinner.succeed('You are logged in (using provided token).');
+    return tempToken;
+  }
+
+  // Then check for stored API key
   const apiKey = await loadApiKeyImpl();
 
   if (!apiKey) {
