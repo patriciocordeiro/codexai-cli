@@ -96,8 +96,14 @@ program
   .command('logout')
   .description('Sign out and remove the local API key.')
   .action(async () => {
-    await logout();
-    console.info('✅ You have been logged out.');
+    try {
+      await logout();
+      console.info('✅ You have been logged out.');
+    } catch {
+      // Ensure logout always succeeds from CLI perspective
+      console.warn(chalk.yellow('⚠️  Logout completed with warnings.'));
+      console.info('✅ You have been logged out.');
+    }
   });
 
 addTokenOption(

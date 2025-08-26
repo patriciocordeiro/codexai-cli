@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/codeai-org/cli.git"
+    "url": "https://github.com/patriciocordeiro/codexai-cli.git"
   },
   "keywords": [
     "cli",
@@ -24,9 +24,9 @@
   ],
   "author": "CodeAI Team <support@codeai.com>",
   "license": "SEE LICENSE IN LICENSE",
-  "homepage": "https://github.com/codeai-org/cli#readme",
+  "homepage": "https://github.com/patriciocordeiro/codexai-cli#readme",
   "bugs": {
-    "url": "https://github.com/codeai-org/cli/issues"
+    "url": "https://github.com/patriciocordeiro/codexai-cli/issues"
   },
   "engines": {
     "node": ">=22.18.0"
