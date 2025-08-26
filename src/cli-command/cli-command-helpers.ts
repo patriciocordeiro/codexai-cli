@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { webLogin } from '../auth/auth';
+import { hasTemporaryToken, webLogin } from '../auth/auth';
 import {
   deployOutOfSyncFiles,
   displayNoFilesToAnalyze,
@@ -175,6 +175,17 @@ export async function runAnalysis({
         error instanceof Error &&
         error.message === 'Authentication required'
       ) {
+        // If a temporary token was provided but authentication failed,
+        // it means the token is invalid
+        if (hasTemporaryToken()) {
+          console.error(
+            chalk.red.bold(
+              '\n❌ Invalid API token provided. Please check your token and try again.'
+            )
+          );
+          process.exit(1);
+        }
+
         if (nonInteractive) {
           console.error(
             chalk.red.bold(

@@ -13,16 +13,60 @@ import {
 } from '../constants/constants';
 import { openBrowser } from '../helpers/cli/cli-helpers';
 
-if (!CLI_CONFIG_DIR || !API_BASE_URL || !WEB_APP_URL) {
-  console.error(
-    chalk.red('Error: One or more required environment variables are not set.')
-  );
-  process.exit(1);
+// Global variable to store temporary token from CLI options
+let temporaryToken: string | null = null;
+
+/**
+ * Sets a temporary token for the current session (from CLI options)
+ * @param {string | null} token - The token to use for this session
+ */
+export function setTemporaryToken(token: string | null): void {
+  temporaryToken = token;
 }
-const CONFIG_PATH = path.join(
-  CLI_CONFIG_DIR.replace('~', os.homedir()),
-  'config.json'
-);
+
+/**
+ * Gets the temporary token for the current session
+ * @returns {string | null} The temporary token or null
+ */
+export function getTemporaryToken(): string | null {
+  return temporaryToken;
+}
+
+/**
+ * Checks if a temporary token is currently set
+ * @returns {boolean} True if a temporary token is set
+ */
+export function hasTemporaryToken(): boolean {
+  return temporaryToken !== null;
+}
+
+/**
+ * Validates that required environment variables are set
+ * @throws {Error} If required environment variables are missing
+ */
+function validateEnvironmentVariables(): void {
+  if (!CLI_CONFIG_DIR || !API_BASE_URL || !WEB_APP_URL) {
+    console.error(
+      chalk.red(
+        'Error: One or more required environment variables are not set.'
+      )
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Gets the config path, validating environment variables first
+ * @returns {string} The config file path
+ */
+function getConfigPath(): string {
+  validateEnvironmentVariables();
+  // After validation, we know CLI_CONFIG_DIR is defined
+  if (!CLI_CONFIG_DIR) {
+    throw new Error('CLI_CONFIG_DIR is not set');
+  }
+  return path.join(CLI_CONFIG_DIR.replace('~', os.homedir()), 'config.json');
+}
 
 /**
  * Saves the provided API key to the local config file.
@@ -32,9 +76,10 @@ const CONFIG_PATH = path.join(
  */
 export async function saveApiKey(apiKey: string): Promise<void> {
   try {
-    await fse.ensureDir(path.dirname(CONFIG_PATH));
-    await fse.writeJson(CONFIG_PATH, { apiKey });
-    await fse.chmod(CONFIG_PATH, 0o600);
+    const configPath = getConfigPath();
+    await fse.ensureDir(path.dirname(configPath));
+    await fse.writeJson(configPath, { apiKey });
+    await fse.chmod(configPath, 0o600);
   } catch (error) {
     console.error('Failed to save API key.', error);
     throw error;
@@ -43,12 +88,20 @@ export async function saveApiKey(apiKey: string): Promise<void> {
 
 /**
  * Loads the API key from the local config file, if it exists.
+ * If a temporary token is set (from CLI options), returns that instead.
  * @returns {Promise<string | null>} The API key, or null if not found.
  */
 export async function loadApiKey(): Promise<string | null> {
   try {
-    if (await fse.pathExists(CONFIG_PATH)) {
-      const config = await fse.readJson(CONFIG_PATH);
+    // First check if we have a temporary token from CLI options
+    if (temporaryToken) {
+      return temporaryToken;
+    }
+
+    // Otherwise, load from config file
+    const configPath = getConfigPath();
+    if (await fse.pathExists(configPath)) {
+      const config = await fse.readJson(configPath);
       return config.apiKey;
     }
     return null;
@@ -64,8 +117,9 @@ export async function loadApiKey(): Promise<string | null> {
  */
 async function removeApiKey(): Promise<void> {
   try {
-    if (await fse.pathExists(CONFIG_PATH)) {
-      await fse.remove(CONFIG_PATH);
+    const configPath = getConfigPath();
+    if (await fse.pathExists(configPath)) {
+      await fse.remove(configPath);
     }
   } catch (error) {
     console.error('Failed to remove API key.', error);
@@ -78,6 +132,114 @@ async function removeApiKey(): Promise<void> {
  * @returns {Promise<void>} Resolves after the delay.
  */
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Saves the provided API token directly for CI environments.
+ * @param {string} token - The API token to save.
+ * @returns {Promise<void>} Resolves when the token is saved successfully.
+ */
+export async function loginWithToken(token: string): Promise<void> {
+  const spinner = ora('Validating and saving API token...').start();
+
+  try {
+    // Validate the token by making a test API call
+    const response = await axios.get(`${API_BASE_URL}/validate-token`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 200) {
+      await saveApiKey(token);
+      spinner.succeed(chalk.green('✅ API token saved successfully!'));
+      console.info(chalk.dim('You can now use CodeAI CLI commands.'));
+    } else {
+      spinner.fail(chalk.red('❌ Invalid API token.'));
+      throw new Error('Invalid API token provided.');
+    }
+  } catch (error) {
+    spinner.fail(chalk.red('❌ Failed to validate API token.'));
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      throw new Error('Invalid API token provided.');
+    } else {
+      throw new Error(
+        'Failed to validate API token. Please check your network connection.'
+      );
+    }
+  }
+}
+
+/**
+ * Initiates the web-based login flow for CI environments.
+ * Opens the browser and polls for API key until login is complete or times out.
+ * Displays the token instead of saving it to local config.
+ * @param {boolean} [isOpenBrowser] - Whether to automatically open the browser
+ * @returns {Promise<void>} Resolves when login is successful, otherwise throws on timeout.
+ */
+export async function webLoginCI(isOpenBrowser?: boolean): Promise<void> {
+  const sessionId = uuidv4();
+  const loginUrl = `${WEB_APP_URL}/${WEB_LOGIN_PAGE_LINK}?session=${sessionId}`;
+
+  console.info(
+    chalk.bold('\nTo complete authentication, your browser will now open.')
+  );
+  console.info(
+    chalk.dim('If it does not open automatically, please visit this URL:')
+  );
+
+  // Use chalk to style the link, making it easy to see and copy
+  console.info(chalk.cyan.underline(loginUrl));
+
+  // --- Automatically open the browser (only if isOpenBrowser is true) ---
+  if (isOpenBrowser) {
+    try {
+      await openBrowser(loginUrl);
+    } catch {
+      console.warn(
+        chalk.yellow(
+          'Warning: Could not automatically open the browser. Please copy the link above.'
+        )
+      );
+    }
+  }
+
+  const spinner = ora('Waiting for you to log in in the browser...').start();
+  const maxAttempts = 40;
+  const pollInterval = 3000;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/getCliApiKeyFunction`,
+        {
+          data: { sessionId },
+        }
+      );
+      if (response.data && response.data.result.apiKey) {
+        const apiKey = response.data.result.apiKey;
+        spinner.succeed(chalk.green('✅ Successfully authenticated!'));
+
+        console.info(chalk.bold('\n🔑 Your API Token:'));
+        console.info(chalk.cyan.bold(apiKey));
+        console.info(
+          chalk.dim(
+            '\nNote: This token was not saved locally. Use it in your CI environment by setting:'
+          )
+        );
+        console.info(chalk.dim('CODEAI_API_KEY=' + apiKey));
+
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      // Ignore polling errors while waiting
+    }
+    await delay(pollInterval);
+  }
+
+  spinner.fail(chalk.red('❌ Login timed out. Please try again.'));
+  throw new Error('Login timed out.');
+}
 
 /**
  * Initiates the web-based login flow for authentication.

@@ -531,6 +531,8 @@ module.exports = { multiply };`
       expect(result.exitCode).toBe(0);
       const output = result.stdout + result.stderr;
       expect(output).toContain('Usage:');
+      expect(output).toContain('login:ci');
+      expect(output).toContain('Authenticate for CI environments');
     });
   });
 
