@@ -21,7 +21,7 @@ jobs:
       MAX_RETRIES: ${{ vars.MAX_RETRIES }}
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.18.x]
 
     steps:
       - name: Checkout code

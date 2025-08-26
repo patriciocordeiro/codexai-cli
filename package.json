@@ -29,7 +29,7 @@
     "url": "https://github.com/codeai-org/cli/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "build": "NODE_ENV=production node scripts/build.js",
