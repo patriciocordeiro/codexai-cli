@@ -13,6 +13,7 @@ import { AnalysisScope } from '../models/cli.model';
 import {
   createProjectWithFiles,
   getProjectManifest,
+  getProjectStatus,
   triggerAnalysis,
   updateProjectFiles,
 } from './api';
@@ -1159,6 +1160,78 @@ describe('api', () => {
           updatedManifest,
         })
       ).rejects.toThrow();
+    });
+  });
+
+  describe('getProjectStatus', () => {
+    const apiKey = 'test-api-key';
+    const projectId = 'proj-xyz';
+    const endpointUrl = 'https://api.test.com/getProjectStatusFunction';
+    const mockSuccessResponse = {
+      status: 'ready_for_analysis',
+      project: { id: 'proj-xyz', name: 'Test Project' },
+    };
+
+    it('should get project status successfully', async () => {
+      // Arrange
+      mockedAxios.post.mockResolvedValue({ data: mockSuccessResponse });
+
+      // Act
+      const result = await getProjectStatus({
+        apiKey,
+        projectId,
+      });
+
+      // Assert
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        endpointUrl,
+        { data: { projectId } },
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        }
+      );
+      expect(result).toEqual(mockSuccessResponse);
+    });
+
+    it('should handle errors when getting project status', async () => {
+      // Arrange
+      const axiosError = {
+        response: {
+          status: 404,
+          data: { message: 'Project not found' },
+          statusText: 'Not Found',
+          headers: {},
+          config: { headers: {} },
+        },
+        config: { headers: {} },
+        request: {},
+        message: 'Request failed with status code 404',
+        name: 'AxiosError',
+        isAxiosError: true,
+      } as AxiosError;
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
+
+      // Act & Assert
+      await expect(getProjectStatus({ apiKey, projectId })).rejects.toThrow(
+        'Resource not found. The requested project or endpoint does not exist.'
+      );
+    });
+
+    it('should handle non-Error objects when getting project status', async () => {
+      // Arrange
+      const unknownError = 'String error';
+
+      // Configure mocks
+      mockIsAxiosError.mockReturnValue(false);
+      mockedAxios.post.mockRejectedValue(unknownError);
+
+      // Act & Assert
+      await expect(getProjectStatus({ apiKey, projectId })).rejects.toThrow(
+        'Unknown error occurred while fetching project status. Please try again.'
+      );
     });
   });
 });

@@ -8,6 +8,8 @@ import {
   CreateProjectWithFilesOutput,
   GetProjectManifestInput,
   GetProjectManifestOutput,
+  GetProjectStatusInput,
+  GetProjectStatusOutput,
   TriggerAnalysisInput,
   TriggerAnalysisOutput,
   UpdateProjectFilesInput,
@@ -119,6 +121,32 @@ export async function getProjectManifest({
     return response.data.manifest;
   } catch (error) {
     return handleApiError(error, 'fetching project manifest');
+  }
+}
+
+/**
+ * Fetches the current status of a project.
+ * @param {GetProjectStatusInput} params - The input parameters for fetching the project status.
+ * @param {string} params.apiKey - The API key for authentication.
+ * @param {string} params.projectId - The ID of the project.
+ * @returns {Promise<GetProjectStatusOutput>} The project status and ID.
+ */
+export async function getProjectStatus({
+  apiKey,
+  projectId,
+}: GetProjectStatusInput): Promise<GetProjectStatusOutput> {
+  const endpointUrl = `${API_BASE_URL}/getProjectStatusFunction`;
+  try {
+    const response = await axios.post(
+      endpointUrl,
+      { data: { projectId } },
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    return handleApiError(error, 'fetching project status');
   }
 }
 

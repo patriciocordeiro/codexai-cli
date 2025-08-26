@@ -62,6 +62,7 @@ jest.mock('../config/config-helpers', () => ({
 
 jest.mock('../../api/api', () => ({
   getProjectManifest: jest.fn(),
+  getProjectStatus: jest.fn(),
   updateProjectFiles: jest.fn(),
   __esModule: true,
 }));
@@ -132,6 +133,12 @@ describe('deploy-helpers', () => {
     configHelpers.loadProjectConfig = jest.fn().mockResolvedValue({
       projectId: 'test-project-id',
       targetDirectory: ['src', 'test'],
+    } as never);
+
+    // Mock getProjectStatus to return ready status by default
+    api.getProjectStatus = jest.fn().mockResolvedValue({
+      status: 'ready_for_analysis',
+      projectId: 'test-project-id',
     } as never);
   });
 
@@ -503,6 +510,36 @@ describe('deploy-helpers', () => {
       await expect(
         deployHelpers.deployChangesIfNeeded('test-api-key', 'test-project')
       ).rejects.toThrow('Deployment Error');
+    });
+
+    it('should wait for project to be ready before checking manifest', async () => {
+      // Arrange: Mock project status to be ready immediately
+      api.getProjectStatus.mockResolvedValue({
+        status: 'ready_for_analysis',
+        projectId: 'test-project',
+      } as never);
+
+      const mockRemoteManifest = { 'file1.txt': 'samehash' };
+      const mockLocalArchive = {
+        archive: Buffer.from('archive'),
+        fileManifest: { 'file1.txt': 'samehash' },
+      };
+
+      configHelpers.getTargetDirectory.mockResolvedValue(['src']);
+      api.getProjectManifest.mockResolvedValue(mockRemoteManifest);
+      fileUtils.createProjectArchive.mockResolvedValue(mockLocalArchive);
+
+      // Act
+      await deployHelpers.deployChangesIfNeeded('test-api-key', 'test-project');
+
+      // Assert
+      expect(api.getProjectStatus).toHaveBeenCalledWith({
+        apiKey: 'test-api-key',
+        projectId: 'test-project',
+      });
+      expect(mockSpinner.succeed).toHaveBeenCalledWith(
+        expect.stringContaining('up-to-date')
+      );
     });
   });
 });

@@ -69,3 +69,19 @@ export interface UpdateProjectFilesInput {
 export interface UpdateProjectFilesOutput {
   message: string;
 }
+
+/**
+ * Input for getProjectStatus
+ */
+export interface GetProjectStatusInput {
+  apiKey: string;
+  projectId: string;
+}
+
+/**
+ * Output for getProjectStatus
+ */
+export interface GetProjectStatusOutput {
+  status: string;
+  projectId: string;
+}

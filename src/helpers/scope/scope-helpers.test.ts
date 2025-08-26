@@ -327,14 +327,24 @@ describe('Analysis Scope Helpers', () => {
       }).not.toThrow();
     });
 
-    it('should throw error for files outside target directory', () => {
+    it('should ignore files outside target directory and log them', () => {
       const { validatePathsInScope } = require('./scope-helpers');
 
+      const paths = ['../config.js'];
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
       expect(() => {
-        validatePathsInScope(['../config.js'], 'src', '/test/project');
-      }).toThrow(
-        'File path "../config.js" is outside the project\'s configured target directory ("src").'
+        validatePathsInScope(paths, 'src', '/test/project');
+      }).not.toThrow();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring file outside target directory')
       );
+      expect(paths).toEqual([]);
+
+      consoleLogSpy.mockRestore();
     });
 
     it('should handle empty file paths array', () => {
@@ -345,14 +355,44 @@ describe('Analysis Scope Helpers', () => {
       }).not.toThrow();
     });
 
-    it('should throw error for absolute paths outside target directory', () => {
+    it('should ignore absolute paths outside target directory and log them', () => {
       const { validatePathsInScope } = require('./scope-helpers');
 
+      const paths = ['/etc/passwd'];
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
       expect(() => {
-        validatePathsInScope(['/etc/passwd'], 'src', '/test/project');
-      }).toThrow(
-        'File path "/etc/passwd" is outside the project\'s configured target directory ("src").'
+        validatePathsInScope(paths, 'src', '/test/project');
+      }).not.toThrow();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring file outside target directory')
       );
+      expect(paths).toEqual([]);
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should ignore debug-cli.js (file outside project src) and log it', () => {
+      const { validatePathsInScope } = require('./scope-helpers');
+
+      const paths = ['debug-cli.js'];
+      const consoleLogSpy = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+
+      expect(() => {
+        validatePathsInScope(paths, 'src', '/test/project');
+      }).not.toThrow();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Ignoring file outside target directory')
+      );
+      expect(paths).toEqual([]);
+
+      consoleLogSpy.mockRestore();
     });
   });
 

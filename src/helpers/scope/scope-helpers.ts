@@ -80,15 +80,32 @@ export function validatePathsInScope(
 ): void {
   const absoluteTargetDir = path.resolve(projectRoot, targetDirectory);
   if (targetFilePaths.length === 0) return;
+  const ignoredFiles: string[] = [];
+  const validFiles: string[] = [];
+
   for (const file of targetFilePaths) {
     const absoluteFile = path.resolve(projectRoot, file);
     const relative = path.relative(absoluteTargetDir, absoluteFile);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new Error(
-        `File path "${file}" is outside the project's configured target directory ("${targetDirectory}").`
+      // Collect files that are outside the configured target directory
+      ignoredFiles.push(file);
+    } else {
+      validFiles.push(file);
+    }
+  }
+
+  if (ignoredFiles.length > 0) {
+    // Log ignored files and continue. Caller will see targetFilePaths mutated.
+    for (const ignored of ignoredFiles) {
+      console.log(
+        `Ignoring file outside target directory: "${ignored}" (target: "${targetDirectory}")`
       );
     }
   }
+
+  // Mutate the input array to contain only valid files so callers continue with filtered list
+  targetFilePaths.length = 0;
+  targetFilePaths.push(...validFiles);
 }
 
 /**

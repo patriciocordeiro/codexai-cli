@@ -1,7 +1,11 @@
 import chalk from 'chalk';
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import path from 'path';
-import { getProjectManifest, updateProjectFiles } from '../../api/api';
+import {
+  getProjectManifest,
+  getProjectStatus,
+  updateProjectFiles,
+} from '../../api/api';
 import { checkAuthentication, loadApiKey } from '../../auth/auth';
 import { CONFIG_FILE_NAME } from '../../constants/constants';
 import {
@@ -20,6 +24,52 @@ import {
 } from '../config/config-helpers';
 
 /**
+ * Waits for a project to reach "ready_for_analysis" status by polling.
+ * @param {string} apiKey - The API key for authentication.
+ * @param {string} projectId - The project ID to check.
+ * @param {ora.Ora} spinner - The ora spinner instance for status updates.
+ * @returns {Promise<void>} Resolves when project is ready or throws on timeout/error.
+ */
+async function waitForProjectReady(
+  apiKey: string,
+  projectId: string,
+  spinner: Ora
+): Promise<void> {
+  const maxAttempts = 30; // 5 minutes max (10 second intervals)
+  const pollInterval = 10000; // 10 seconds
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { status } = await getProjectStatus({ apiKey, projectId });
+
+      if (status === 'ready_for_analysis') {
+        spinner.succeed('Project is ready for analysis.');
+        return;
+      }
+
+      spinner.text = `Waiting for project to be ready... (${status}, attempt ${attempt}/${maxAttempts})`;
+
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    } catch (error: unknown) {
+      // If we get a 404, the project might still be processing
+      const apiError = error as { statusCode?: number };
+      if (apiError.statusCode === 404 && attempt < maxAttempts) {
+        spinner.text = `Project not found, waiting... (attempt ${attempt}/${maxAttempts})`;
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error(
+    `Project did not reach ready_for_analysis status after ${(maxAttempts * pollInterval) / 1000} seconds. Please try again later.`
+  );
+}
+
+/**
  * Checks for local file changes and deploys updates to the remote project if needed.
  * @param {string} apiKey - The API key for authentication.
  * @param {string} projectId - The project ID to update.
@@ -29,7 +79,14 @@ export async function deployChangesIfNeeded(
   apiKey: string,
   projectId: string
 ): Promise<void> {
-  const spinner = ora('Checking for local file changes...').start();
+  const spinner = ora('Checking for local file changes...');
+  spinner.start();
+
+  // Wait for project to be ready before proceeding
+  await waitForProjectReady(apiKey, projectId, spinner);
+
+  // Create a new spinner for the next phase since the previous one was completed
+  const deploySpinner = ora('Checking for local file changes...').start();
   const targetDirectory = await getTargetDirectory();
   const [remoteManifest, { fileManifest: localManifest }] = await Promise.all([
     getProjectManifest({ apiKey, projectId }),
@@ -44,7 +101,7 @@ export async function deployChangesIfNeeded(
     }
   }
   if (filesToUpdate.length > 0) {
-    spinner.warn(
+    deploySpinner.warn(
       chalk.yellow(
         `Found ${filesToUpdate.length} local changes. Deploying updates before analysis...`
       )
@@ -59,9 +116,9 @@ export async function deployChangesIfNeeded(
       patchZipBuffer,
       updatedManifest: manifestForUpdate,
     });
-    spinner.succeed('Project context updated successfully.');
+    deploySpinner.succeed('Project context updated successfully.');
   } else {
-    spinner.succeed('Project is up-to-date.');
+    deploySpinner.succeed('Project is up-to-date.');
   }
 }
 
