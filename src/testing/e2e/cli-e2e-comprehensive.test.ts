@@ -1,11 +1,80 @@
 /* eslint-disable jsdoc/require-jsdoc */
 /* eslint-disable jsdoc/require-returns */
 
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
 import { spawn } from 'child_process';
 import * as fse from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
+
+// Mock axios to prevent any network calls
+jest.mock('axios', () => ({
+  default: {
+    get: jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.reject(new Error('Network calls are mocked'))
+      ),
+    post: jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.reject(new Error('Network calls are mocked'))
+      ),
+    put: jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.reject(new Error('Network calls are mocked'))
+      ),
+    delete: jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.reject(new Error('Network calls are mocked'))
+      ),
+    isAxiosError: jest.fn().mockReturnValue(false),
+  },
+  get: jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.reject(new Error('Network calls are mocked'))
+    ),
+  post: jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.reject(new Error('Network calls are mocked'))
+    ),
+  put: jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.reject(new Error('Network calls are mocked'))
+    ),
+  delete: jest
+    .fn()
+    .mockImplementation(() =>
+      Promise.reject(new Error('Network calls are mocked'))
+    ),
+  isAxiosError: jest.fn().mockReturnValue(false),
+}));
+
+// Mock the 'open' module to prevent browser opening
+jest.mock('open', () => jest.fn());
+
+// Mock 'ora' to prevent loading spinners in tests
+jest.mock('ora', () =>
+  jest.fn(() => ({
+    start: jest.fn().mockReturnThis(),
+    stop: jest.fn().mockReturnThis(),
+    succeed: jest.fn().mockReturnThis(),
+    fail: jest.fn().mockReturnThis(),
+    text: '',
+  }))
+);
 
 const cliPath = path.resolve(__dirname, '../../..', 'dist/index.js');
 
@@ -18,6 +87,18 @@ interface CliResult {
 describe('CodeAI CLI E2E Tests - Comprehensive', () => {
   let tempTestDir: string;
   let originalCwd: string;
+  // Much shorter timeouts since no network calls should occur
+  const DEFAULT_CI_TIMEOUT = 2000;
+  const DEFAULT_LOCAL_TIMEOUT = 1000;
+  const E2E_TIMEOUT = process.env.E2E_TIMEOUT
+    ? parseInt(process.env.E2E_TIMEOUT, 10)
+    : process.env.CI
+      ? DEFAULT_CI_TIMEOUT
+      : DEFAULT_LOCAL_TIMEOUT;
+  const CLI_TIMEOUT = E2E_TIMEOUT;
+  const maybeLog = (...args: unknown[]) => {
+    if (!process.env.CI) console.log(...args);
+  };
 
   beforeEach(async () => {
     originalCwd = process.cwd();
@@ -49,16 +130,19 @@ module.exports = { add };`
 }
 module.exports = { multiply };`
     );
-  });
+  }, 30000);
 
   afterEach(async () => {
     process.chdir(originalCwd);
     if (await fse.pathExists(tempTestDir)) {
       await fse.remove(tempTestDir);
     }
-  });
+  }, 30000);
 
-  const runCli = (args: string[], timeout = 30000): Promise<CliResult> => {
+  const runCli = (
+    args: string[],
+    timeout = CLI_TIMEOUT
+  ): Promise<CliResult> => {
     return new Promise((resolve, reject) => {
       const child = spawn('node', [cliPath, ...args], {
         cwd: tempTestDir,
@@ -69,6 +153,8 @@ module.exports = { multiply };`
           CODEAI_WEB_URL: 'http://localhost:3000',
           CODEAI_API_URL: 'http://localhost:5001/codex-ai-30da8/us-central1',
           CLI_CONFIG_DIR: path.join(os.tmpdir(), 'codeai-cli-test'),
+          E2E_TEST_MODE: 'true', // Skip browser opening and network calls
+          NO_BROWSER: 'true', // Additional flag to skip browser opening
         },
       });
 
@@ -121,14 +207,14 @@ module.exports = { multiply };`
       const output = result.stdout + result.stderr;
       expect(output).toContain('Usage:');
       expect(output).toContain('Commands:');
-    });
+    }, 15000);
 
     it('should show version', async () => {
       const result = await runCli(['--version']);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toMatch(/\d+\.\d+\.\d+/);
-    });
+    }, 15000);
 
     it('should show help for create command', async () => {
       const result = await runCli(['help', 'create']);
@@ -141,21 +227,24 @@ module.exports = { multiply };`
     });
 
     it('should use localhost URLs in development mode', async () => {
+      const CLI_TIMEOUT = process.env.CI ? 10000 : 3000;
       // First test if environment variables are being passed correctly
-      const envTestResult = await runCli(['--version'], 3000).catch(error => {
-        // Capture timeout error but return partial results
-        return {
-          exitCode: -1,
-          stdout: error.stdout || '',
-          stderr: error.stderr || error.message || '',
-        };
-      });
+      const envTestResult = await runCli(['--version'], CLI_TIMEOUT).catch(
+        error => {
+          // Capture timeout error but return partial results
+          return {
+            exitCode: -1,
+            stdout: error.stdout || '',
+            stderr: error.stderr || error.message || '',
+          };
+        }
+      );
 
-      console.log('=== ENV TEST OUTPUT ===');
-      console.log(envTestResult.stdout + envTestResult.stderr);
-      console.log('=== END ENV TEST ===');
+      maybeLog('=== ENV TEST OUTPUT ===');
+      maybeLog(envTestResult.stdout + envTestResult.stderr);
+      maybeLog('=== END ENV TEST ===');
 
-      const result = await runCli(['login', '--no-browser'], 3000).catch(
+      const result = await runCli(['login', '--no-browser'], CLI_TIMEOUT).catch(
         error => {
           // Capture timeout error but return partial results
           return {
@@ -167,9 +256,9 @@ module.exports = { multiply };`
       );
 
       const output = result.stdout + result.stderr;
-      console.log('=== LOGIN URL OUTPUT ===');
-      console.log(output);
-      console.log('=== END URL OUTPUT ===');
+      maybeLog('=== LOGIN URL OUTPUT ===');
+      maybeLog(output);
+      maybeLog('=== END URL OUTPUT ===');
 
       // Verify that localhost URLs are being used
       expect(output).toContain('localhost:3000');
@@ -565,9 +654,10 @@ module.exports = { multiply };`
       // This test requires a real API key - unskip only for testing with real auth
       const realApiKey = process.env.CODEAI_API_KEY || '';
 
-      if (!realApiKey) {
-        console.log(
-          'Skipping real API test - no CODEAI_API_KEY environment variable'
+      // Only run this test when explicitly allowed
+      if (!realApiKey || process.env.RUN_REAL_E2E !== 'true') {
+        maybeLog(
+          'Skipping real API test - set RUN_REAL_E2E=true and CODEAI_API_KEY to enable'
         );
         return;
       }
@@ -575,7 +665,7 @@ module.exports = { multiply };`
       // Custom runCli for real API testing with production URLs
       const runCliProduction = (
         args: string[],
-        timeout = 30000
+        timeout = E2E_TIMEOUT
       ): Promise<CliResult> => {
         return new Promise((resolve, reject) => {
           const child = spawn('node', [cliPath, ...args], {

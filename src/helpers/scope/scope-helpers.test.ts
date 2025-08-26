@@ -305,10 +305,11 @@ describe('Analysis Scope Helpers', () => {
         throw new Error('Not a git repository');
       });
 
-      const { getFilesForScope } = require('./scope-helpers');
+      // Import the function under test
+      const scopeHelpers = require('./scope-helpers');
 
       expect(() => {
-        getFilesForScope([], { changed: true });
+        scopeHelpers.getFilesForScope([], { changed: true });
       }).toThrow('Failed to get changed files from git.');
     });
   });

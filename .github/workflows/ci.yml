@@ -13,12 +13,18 @@ jobs:
       API_URL: ${{ vars.API_URL }}
       NODE_ENV: ${{ vars.NODE_ENV }}
       LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-      CODEAI_WEB_URL: ${{ vars.CODEAI_WEB_URL }}
-      CODEAI_API_URL: ${{ vars.CODEAI_API_URL }}
+      # CODEAI_WEB_URL and CODEAI_API_URL are overridden for CI below
       CLI_CONFIG_DIR: ${{ vars.CLI_CONFIG_DIR }}
       CLI_TIMEOUT: ${{ vars.CLI_TIMEOUT }}
       HTTP_TIMEOUT: ${{ vars.HTTP_TIMEOUT }}
       MAX_RETRIES: ${{ vars.MAX_RETRIES }}
+      # CI safety overrides for E2E tests
+      E2E_TIMEOUT: '2000'
+      # Force tests to target localhost and ensure no real API key is present
+      CODEAI_WEB_URL: 'http://localhost:3000'
+      CODEAI_API_URL: 'http://localhost:5001/codex-ai-30da8/us-central1'
+      CODEAI_API_KEY: ''
+      RUN_REAL_E2E: 'false'
     strategy:
       matrix:
         node-version: [22.18.x]
@@ -54,4 +60,4 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npm test
+        run: npm test -- --silent

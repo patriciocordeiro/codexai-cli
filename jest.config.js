@@ -5,6 +5,7 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
+  testTimeout: process.env.CI ? 10000 : 5000, // 10s in CI, 5s locally
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',

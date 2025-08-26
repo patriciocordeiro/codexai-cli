@@ -40,6 +40,15 @@ export async function confirmFileLimit(fileCount: number): Promise<void> {
  * @returns {Promise<void>} Resolves when the browser is opened or warns if no URL is provided.
  */
 export async function openBrowser(url: string): Promise<void> {
+  // Skip browser opening in test environments
+  if (
+    process.env.E2E_TEST_MODE === 'true' ||
+    process.env.NO_BROWSER === 'true'
+  ) {
+    console.log(`Browser opening skipped (test mode): ${url}`);
+    return;
+  }
+
   const os = await import('os');
   const { executeCommand } = await import('../shell/shell-helpers');
   if (url.length) {
