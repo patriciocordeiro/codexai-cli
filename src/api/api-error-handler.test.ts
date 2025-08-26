@@ -519,7 +519,7 @@ describe('api-error-handler', () => {
       it('should handle axios error with undefined status', () => {
         const axiosError = new AxiosError('Network Error');
         axiosError.response = {
-          status: undefined as any,
+          status: undefined as never,
           data: {},
           statusText: 'Unknown',
           headers: {},
