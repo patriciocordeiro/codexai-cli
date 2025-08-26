@@ -131,7 +131,9 @@ async function removeApiKey(): Promise<void> {
   } catch (error) {
     // In E2E test mode or CI, don't fail on file system errors
     if (process.env.E2E_TEST_MODE === 'true' || process.env.CI === 'true') {
-      console.log(chalk.yellow('No stored API key found.'));
+      // Log the failure so tests and CI logs see the underlying error, but
+      // don't re-throw to avoid failing the whole process in CI/E2E runs.
+      console.error('Failed to remove API key.', error);
       return;
     }
 
