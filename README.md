@@ -215,3 +215,19 @@ For technical support, feature requests, or enterprise inquiries:
 - Verify the files/folders you're trying to analyze exist
 
 This README reflects the **actual current functionality** of the CLI as implemented.
+
+## License
+
+**Commercial Software** - Copyright (c) 2025 Patrício Cordeiro. All rights reserved.
+
+This software is proprietary and confidential. See the [LICENSE](LICENSE) file for full terms.
+
+- **Evaluation**: 30-day free trial
+- **Personal Use**: Limited non-commercial use permitted
+- **Commercial Use**: Requires valid commercial license
+
+For commercial licensing inquiries, contact: license@codeai.com
+
+## Pricing & Plans
+
+Visit [https://codeai.com/pricing](https://codeai.com/pricing) for current pricing plans and API usage limits.
