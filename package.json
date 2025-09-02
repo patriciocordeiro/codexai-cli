@@ -53,7 +53,8 @@
     "prepare": "husky || true",
     "publish": "npm publish",
     "commitlint": "commitlint --edit",
-    "patch-version": "npm version patch"
+    "patch-version": "npm version patch",
+    "package": "npm pack"
   },
   "dependencies": {
     "archiver": "^7.0.1",

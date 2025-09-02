@@ -197,12 +197,83 @@ const STATUS_CODE_INFO: Record<number, ErrorInfo> = {
 };
 
 /**
+ * Checks if an error indicates the server is unreachable.
+ * @param {unknown} error - The error to check.
+ * @returns {boolean} True if the server appears to be unreachable.
+ */
+function isServerUnreachable(error: unknown): boolean {
+  if (axios.isAxiosError(error)) {
+    // Network errors (ECONNREFUSED, ENOTFOUND, ETIMEDOUT, etc.)
+    if (
+      error.code === 'ECONNREFUSED' ||
+      error.code === 'ENOTFOUND' ||
+      error.code === 'ETIMEDOUT' ||
+      error.code === 'ECONNRESET' ||
+      error.message.includes('Network Error') ||
+      error.message.includes('timeout')
+    ) {
+      return true;
+    }
+
+    // No response means network failure
+    if (!error.response) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Handles server unreachable scenarios with CI-friendly behavior.
+ * @param {string} operation - The operation that failed.
+ */
+function handleServerUnreachable(operation: string): never {
+  const isCI = Boolean(process.env.CI) || !process.stdin.isTTY;
+
+  console.error(`\n🌐 Server unreachable while ${operation}`);
+  console.error('The CodeAI server cannot be reached. This could be due to:');
+  console.error('  • Network connectivity issues');
+  console.error('  • Server maintenance or downtime');
+  console.error('  • Firewall or proxy blocking the connection');
+  console.error('  • DNS resolution problems');
+
+  if (isCI) {
+    console.warn('\n⚠️  Running in CI environment - continuing gracefully');
+    console.warn('Set CODEAI_FAIL_ON_UNREACHABLE=true to make CI fail instead');
+
+    // Exit with 0 in CI unless explicitly told to fail
+    if (process.env.CODEAI_FAIL_ON_UNREACHABLE === 'true') {
+      console.error(
+        '\n❌ Failing CI as requested by CODEAI_FAIL_ON_UNREACHABLE=true'
+      );
+      process.exit(1);
+    } else {
+      console.info('\n✅ Exiting gracefully (server unreachable)');
+      process.exit(0);
+    }
+  } else {
+    console.error('\n💡 Troubleshooting steps:');
+    console.error('  1. Check your internet connection');
+    console.error('  2. Visit https://status.codexai.dev for service status');
+    console.error('  3. Try again in a few minutes');
+    console.error('  4. Contact support if the issue persists');
+    process.exit(1);
+  }
+}
+
+/**
  * Handles API errors and throws appropriate custom error instances with user-friendly messages and solutions.
  * @param {unknown} error - The error caught from an API call.
  * @param {string} operation - A description of the operation that failed (e.g., 'uploading project files').
  * @throws {ApiError | AuthenticationError | NetworkError | FileSystemError | ValidationError} Appropriate error type with user-friendly message and solutions.
  */
 export function handleApiError(error: unknown, operation: string): never {
+  // Check for server unreachability first
+  if (isServerUnreachable(error)) {
+    handleServerUnreachable(operation);
+  }
+
   if (axios.isAxiosError(error)) {
     const statusCode = error.response?.status;
     const responseData = error.response?.data;

@@ -82,16 +82,80 @@ export async function deployChangesIfNeeded(
   const spinner = ora('Checking for local file changes...');
   spinner.start();
 
-  // Wait for project to be ready before proceeding
-  await waitForProjectReady(apiKey, projectId, spinner);
+  // Optionally allow CI to skip waiting for project readiness. This is
+  // useful in CI pipelines where the project is provisioned/managed in a
+  // separate step and the caller prefers to skip polling to avoid hangs.
+  // Set CODEAI_SKIP_WAIT_FOR_READY=true in the environment to enable.
+  if (process.env.CODEAI_SKIP_WAIT_FOR_READY === 'true') {
+    spinner.warn(
+      'Skipping wait for project readiness (CODEAI_SKIP_WAIT_FOR_READY=true)'
+    );
+  } else {
+    // Wait for project to be ready before proceeding
+    await waitForProjectReady(apiKey, projectId, spinner);
+  }
 
   // Create a new spinner for the next phase since the previous one was completed
   const deploySpinner = ora('Checking for local file changes...').start();
   const targetDirectory = await getTargetDirectory();
-  const [remoteManifest, { fileManifest: localManifest }] = await Promise.all([
-    getProjectManifest({ apiKey, projectId }),
-    createProjectArchive(process.cwd(), targetDirectory),
-  ]);
+
+  // Log and run remote manifest fetch + local archive creation in parallel.
+  // Wrap in try/catch to surface errors clearly in CI logs.
+  let remoteManifest: Record<string, string> = {};
+  let localManifest: Record<string, string> = {};
+  try {
+    deploySpinner.text =
+      'Fetching remote manifest and creating local archive...';
+    console.info(
+      '⏳ Starting: getProjectManifest and createProjectArchive (in parallel)'
+    );
+
+    const [fetchedRemoteManifest, archiveResult] = await Promise.all([
+      getProjectManifest({ apiKey, projectId }),
+      createProjectArchive(process.cwd(), targetDirectory),
+    ]);
+
+    remoteManifest = fetchedRemoteManifest || {};
+    localManifest = (archiveResult && archiveResult.fileManifest) || {};
+
+    console.info(
+      `✅ Remote manifest entries: ${Object.keys(remoteManifest).length}`
+    );
+    console.info(
+      `✅ Local manifest files: ${Object.keys(localManifest).length}`
+    );
+    deploySpinner.text = `Found ${Object.keys(localManifest).length} local files.`;
+  } catch (err) {
+    deploySpinner.fail(
+      'Failed while fetching remote manifest or creating local archive.'
+    );
+
+    // Check if this is a server unreachability issue
+    const isCI = Boolean(process.env.CI) || !process.stdin.isTTY;
+    const errorMsg = err instanceof Error ? err.message : String(err);
+
+    if (
+      errorMsg.includes('Server unreachable') ||
+      errorMsg.includes('ECONNREFUSED') ||
+      errorMsg.includes('ENOTFOUND') ||
+      errorMsg.includes('Network Error')
+    ) {
+      console.error('🌐 Server unreachable during deployment phase');
+
+      if (isCI && process.env.CODEAI_FAIL_ON_UNREACHABLE !== 'true') {
+        console.warn(
+          '⚠️  CI mode: continuing gracefully despite server unreachability'
+        );
+        console.info(
+          '💡 Set CODEAI_FAIL_ON_UNREACHABLE=true to make CI fail instead'
+        );
+        return; // Exit function gracefully, allowing CI to continue
+      }
+    }
+
+    console.error(err);
+    throw err;
+  }
   const filesToUpdate: string[] = [];
   const manifestForUpdate: Record<string, string> = {};
   for (const [filePath, localHash] of Object.entries(localManifest)) {

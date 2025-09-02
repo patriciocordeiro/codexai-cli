@@ -110,19 +110,51 @@ export async function triggerAnalysisAndDisplayResults({
   isOpenBrowser = false,
 }: TriggerAnalysisAndDisplayResultsParams): Promise<void> {
   const spinner = ora('Sending analysis request to the server...').start();
-  const { resultsUrl } = await triggerAnalysis({
-    apiKey,
-    projectId,
-    taskType: task,
-    language,
-    scope,
-    filesForAnalysis: targetFilePaths,
-  });
-  spinner.succeed('Analysis successfully initiated!');
-  console.info('\n✅ View analysis progress and results at:');
-  console.info(chalk.blue.underline(resultsUrl));
-  if (!IS_PRODUCTION && isOpenBrowser) {
-    openBrowser(resultsUrl);
+
+  try {
+    const { resultsUrl } = await triggerAnalysis({
+      apiKey,
+      projectId,
+      taskType: task,
+      language,
+      scope,
+      filesForAnalysis: targetFilePaths,
+    });
+
+    spinner.succeed('Analysis successfully initiated!');
+    console.info('\n✅ View analysis progress and results at:');
+    console.info(chalk.blue.underline(resultsUrl));
+
+    if (!IS_PRODUCTION && isOpenBrowser) {
+      openBrowser(resultsUrl);
+    }
+  } catch (error) {
+    const isCI = Boolean(process.env.CI) || !process.stdin.isTTY;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Check if this is a server unreachability issue
+    if (
+      errorMsg.includes('Server unreachable') ||
+      errorMsg.includes('ECONNREFUSED') ||
+      errorMsg.includes('ENOTFOUND') ||
+      errorMsg.includes('Network Error')
+    ) {
+      spinner.fail('Server unreachable during analysis request');
+      console.error('🌐 Unable to reach CodeAI server for analysis');
+
+      if (isCI && process.env.CODEAI_FAIL_ON_UNREACHABLE !== 'true') {
+        console.warn(
+          '⚠️  CI mode: exiting gracefully despite server unreachability'
+        );
+        console.info(
+          '💡 Set CODEAI_FAIL_ON_UNREACHABLE=true to make CI fail instead'
+        );
+        return; // Exit gracefully
+      }
+    }
+
+    spinner.fail('Failed to initiate analysis');
+    throw error;
   }
 }
 
