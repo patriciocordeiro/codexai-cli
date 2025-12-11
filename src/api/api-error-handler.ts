@@ -204,13 +204,16 @@ const STATUS_CODE_INFO: Record<number, ErrorInfo> = {
 function isServerUnreachable(error: unknown): boolean {
   if (axios.isAxiosError(error)) {
     // Network errors (ECONNREFUSED, ENOTFOUND, ETIMEDOUT, etc.)
+    // Safely read message property (some tests pass partial objects without message)
+    const message = typeof error.message === 'string' ? error.message : '';
+
     if (
       error.code === 'ECONNREFUSED' ||
       error.code === 'ENOTFOUND' ||
       error.code === 'ETIMEDOUT' ||
       error.code === 'ECONNRESET' ||
-      error.message.includes('Network Error') ||
-      error.message.includes('timeout')
+      message.includes('Network Error') ||
+      message.includes('timeout')
     ) {
       return true;
     }
@@ -230,6 +233,12 @@ function isServerUnreachable(error: unknown): boolean {
  */
 function handleServerUnreachable(operation: string): never {
   const isCI = Boolean(process.env.CI) || !process.stdin.isTTY;
+
+  // When running tests, throw an ApiError instead of exiting the process so
+  // test harnesses can catch and assert on the error.
+  if (process.env.NODE_ENV === 'test') {
+    throw new ApiError(`Failed ${operation}. Please try again.`);
+  }
 
   console.error(`\n🌐 Server unreachable while ${operation}`);
   console.error('The CodeAI server cannot be reached. This could be due to:');
