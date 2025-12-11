@@ -144,13 +144,17 @@ addTokenOption(
       '[task]',
       'The analysis task to run (if not provided, you will be prompted to select)'
     )
-    .argument(
-      '[paths...]',
+    .option(
+      '--paths <paths...>',
       'Optional: Specific files or folders to analyze. If omitted, uses the target directory from .codeai.json.'
     )
     .option(
       '--method <method>',
       'Analysis method: "git-diff", "entire-project", or "selected-files". If not provided, defaults to git-diff for git repositories or prompts for selection.'
+    )
+    .option(
+      '--paths <paths...>',
+      'Optional: Specific files or folders to analyze. If omitted, uses the target directory from .codeai.json.'
     )
     .option(
       '-t, --task <task>',
@@ -160,6 +164,14 @@ addTokenOption(
       '-l, --language <lang>',
       'Specify language for analysis results',
       'en'
+    )
+    .option(
+      '--all',
+      'Analyze the entire project, overriding .codeai.json target directory'
+    )
+    .option(
+      '--open-browser',
+      'Open the analysis results in the web dashboard after completion'
     )
 ).action(async (task, paths, options) => {
   handleTokenOption(options);
