@@ -19,14 +19,6 @@ jest.mock('../constants/constants', () => ({
 }));
 
 import {
-  deployOutOfSyncFiles,
-  displayNoFilesToAnalyze,
-  getAnalysisScope,
-  handleAnalysisError,
-  setupAnalysisContext,
-  triggerAnalysisAndDisplayResults,
-} from '../helpers/analysis/analysis-helpers';
-import {
   calculateFileDiff,
   createDeploymentPatch,
   displayDeploymentSuccess,
@@ -36,7 +28,6 @@ import {
   setupDeploymentContext,
   uploadPatch,
 } from '../helpers/deploy/deploy-helpers';
-import { isGitRepository } from '../helpers/git/git-helpers';
 import {
   createRemoteProject,
   displayProjectCreationSuccessMessage,
@@ -45,8 +36,10 @@ import {
   saveProjectConfiguration,
   setupProjectParameters,
 } from '../helpers/project/project-helpers';
-import { AnalysisScope, RunAnalysisParams } from '../models/cli.model';
-import { ProgramCreateProjectParams } from '../models/command-helpers.model';
+import {
+  ProgramCreateProjectParams,
+  RunAnalysisParams,
+} from '../models/command-helpers.model';
 import {
   programCreateProject,
   programDeploy,
@@ -94,10 +87,6 @@ const mockedGetLocalManifest = getLocalManifest as jest.Mock;
 const mockedCalculateFileDiff = calculateFileDiff as jest.Mock;
 const mockedCreateDeploymentPatch = createDeploymentPatch as jest.Mock;
 const mockedUploadPatch = uploadPatch as jest.Mock;
-
-const mockedSetupAnalysisContext = setupAnalysisContext as jest.Mock;
-const mockedGetAnalysisScope = getAnalysisScope as jest.Mock;
-const mockedIsGitRepository = isGitRepository as jest.Mock;
 
 // --- Test Suite ---
 describe('command-helpers', () => {
@@ -254,190 +243,71 @@ describe('command-helpers', () => {
   });
 
   describe('runAnalysis', () => {
-    const params: RunAnalysisParams = {
-      task: 'REVIEW',
-      paths: [],
-      options: {
-        scope: AnalysisScope.ENTIRE_PROJECT,
-        language: 'es',
-        all: true,
-      },
-    };
+    // Mock the AnalysisOrchestrator dynamically imported module
+    const mockRunAnalysis = jest.fn() as jest.MockedFunction<any>;
 
-    it('should execute a full analysis run successfully', async () => {
-      // Arrange
-      mockedSetupAnalysisContext.mockResolvedValue({
-        projectId: 'proj-abc',
-        apiKey: 'api-key-123',
-      } as never);
-      mockedGetAnalysisScope.mockResolvedValue({
-        scope: AnalysisScope.ENTIRE_PROJECT,
-        targetFilePaths: ['file1.ts', 'file2.ts'],
-      } as never);
-      // Mock the additional functions
-      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
-      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
-        undefined as never
-      );
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockRunAnalysis.mockResolvedValue(undefined);
 
-      // Act
-      await runAnalysis(params);
-
-      // Assert
-      expect(setupAnalysisContext).toHaveBeenCalled();
-      expect(getAnalysisScope).toHaveBeenCalledWith({
-        paths: params.paths,
-        scope: params.options.scope,
-      });
-      expect(displayNoFilesToAnalyze).not.toHaveBeenCalled();
-      expect(deployOutOfSyncFiles).toHaveBeenCalledWith({
-        apiKey: 'api-key-123',
-        projectId: 'proj-abc',
-      });
-      // Note: triggerAnalysisAndDisplayResults might not be called due to test setup
-      // expect(triggerAnalysisAndDisplayResults).toHaveBeenCalledWith({
-      //   apiKey: 'api-key-123',
-      //   projectId: 'proj-abc',
-      //   task: params.task,
-      //   language: 'es',
-      //   scope: AnalysisScope.ENTIRE_PROJECT,
-      //   targetFilePaths: [],
-      // });
-      expect(handleAnalysisError).not.toHaveBeenCalled();
+      // Mock the dynamic import
+      jest.doMock('./analysis/analysis-orchestrator', () => ({
+        AnalysisOrchestrator: jest.fn().mockImplementation(() => ({
+          runAnalysis: mockRunAnalysis,
+        })),
+      }));
     });
 
-    it('should default the language to "en" if not provided', async () => {
-      // Arrange
-      const paramsWithoutLang: RunAnalysisParams = {
+    it('should create orchestrator and call runAnalysis with correct parameters', async () => {
+      const params: RunAnalysisParams = {
         task: 'REVIEW',
-        paths: [],
-        options: { scope: AnalysisScope.ENTIRE_PROJECT, all: true }, // No language but with all flag
+        paths: ['src/test.ts'],
+        options: {
+          method: 'selected-files',
+          language: 'en',
+          all: false,
+          openBrowser: true,
+        },
       };
-      mockedSetupAnalysisContext.mockResolvedValue({
-        projectId: 'proj-abc',
-        apiKey: 'api-key-123',
-      } as never);
-      mockedGetAnalysisScope.mockResolvedValue({
-        scope: AnalysisScope.ENTIRE_PROJECT,
-        targetFilePaths: [],
-      } as never);
-      // Mock the additional functions
-      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
-      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
-        undefined as never
-      );
 
-      // Act
-      await runAnalysis(paramsWithoutLang);
-
-      // Assert
-      // Note: Commenting out specific function call checks due to test setup issues
-      // expect(triggerAnalysisAndDisplayResults).toHaveBeenCalledWith(
-      //   expect.objectContaining({
-      //     language: 'en', // Should default here
-      //   })
-      // );
-      expect(setupAnalysisContext).toHaveBeenCalled();
-      expect(getAnalysisScope).toHaveBeenCalled();
-    });
-
-    it('should exit early if scope is SELECTED_FILES and no files are found', async () => {
-      // Arrange
-      mockedSetupAnalysisContext.mockResolvedValue({
-        projectId: 'proj-abc',
-        apiKey: 'api-key-123',
-      } as never);
-      mockedGetAnalysisScope.mockResolvedValue({
-        scope: AnalysisScope.SELECTED_FILES,
-        targetFilePaths: [], // No files returned
-      } as never);
-
-      // Act
       await runAnalysis(params);
 
-      // Assert
-      expect(setupAnalysisContext).toHaveBeenCalled();
-      expect(getAnalysisScope).toHaveBeenCalled();
-      expect(displayNoFilesToAnalyze).toHaveBeenCalled();
-      expect(deployOutOfSyncFiles).not.toHaveBeenCalled();
-      expect(triggerAnalysisAndDisplayResults).not.toHaveBeenCalled();
+      expect(mockRunAnalysis).toHaveBeenCalledWith('REVIEW', ['src/test.ts'], {
+        method: 'selected-files',
+        language: 'en',
+        all: false,
+        openBrowser: true,
+      });
     });
 
-    it('should call the error handler on failure', async () => {
-      // Arrange
-      const error = new Error('Context setup failed');
-      mockedSetupAnalysisContext.mockRejectedValue(error as never);
-
-      // Act
-      await runAnalysis(params);
-
-      // Assert
-      expect(handleAnalysisError).toHaveBeenCalledWith(error);
-      expect(getAnalysisScope).not.toHaveBeenCalled();
-    });
-
-    // TODO: Add test for non-git repository behavior
-    // The main functionality is working, but this test needs refactoring to match current implementation
-
-    it('should set analysisScope to GIT_DIFF for default behavior in git repository', async () => {
-      // Arrange
-      mockedIsGitRepository.mockReturnValue(true);
-      mockedSetupAnalysisContext.mockResolvedValue({
-        projectId: 'proj-abc',
-        apiKey: 'api-key-123',
-      } as never);
-      mockedGetAnalysisScope.mockResolvedValue({
-        scope: AnalysisScope.GIT_DIFF,
-        targetFilePaths: ['file1.ts', 'file2.ts'],
-      } as never);
-      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
-      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
-        undefined as never
-      );
-
-      // Act - default behavior: no paths, no --all, no --changed
-      await runAnalysis({
+    it('should handle missing optional parameters gracefully', async () => {
+      const params: RunAnalysisParams = {
         task: 'REVIEW',
         paths: [],
-        options: {}, // no flags
-      });
-
-      // Assert
-      expect(getAnalysisScope).toHaveBeenCalledWith(
-        expect.objectContaining({ scope: AnalysisScope.GIT_DIFF })
-      );
-    });
-
-    it('should set analysisScope to SELECTED_FILES when specific paths are provided', async () => {
-      // Arrange
-      mockedIsGitRepository.mockReturnValue(true);
-      mockedSetupAnalysisContext.mockResolvedValue({
-        projectId: 'proj-abc',
-        apiKey: 'api-key-123',
-      } as never);
-      mockedGetAnalysisScope.mockResolvedValue({
-        scope: AnalysisScope.SELECTED_FILES,
-        targetFilePaths: ['file1.ts'],
-      } as never);
-      (deployOutOfSyncFiles as jest.Mock).mockResolvedValue(undefined as never);
-      (triggerAnalysisAndDisplayResults as jest.Mock).mockResolvedValue(
-        undefined as never
-      );
-
-      // Act
-      await runAnalysis({
-        task: 'REVIEW',
-        paths: ['file1.ts'],
         options: {},
-      });
+      };
 
-      // Assert
-      expect(getAnalysisScope).toHaveBeenCalledWith(
-        expect.objectContaining({ scope: AnalysisScope.SELECTED_FILES })
-      );
+      await runAnalysis(params);
+
+      expect(mockRunAnalysis).toHaveBeenCalledWith('REVIEW', [], {
+        method: undefined,
+        language: undefined,
+        all: undefined,
+        openBrowser: undefined,
+      });
     });
 
-    // TODO: Add test for CI mode when project config is missing
-    // The main CI functionality is working, but the test setup is complex due to chalk mocking issues
+    it('should propagate errors from orchestrator', async () => {
+      const params: RunAnalysisParams = {
+        task: 'REVIEW',
+        paths: [],
+        options: {},
+      };
+
+      const testError = new Error('Orchestrator failed');
+      mockRunAnalysis.mockRejectedValueOnce(testError);
+
+      await expect(runAnalysis(params)).rejects.toThrow('Orchestrator failed');
+    });
   });
 });
