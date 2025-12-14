@@ -427,6 +427,7 @@ describe('api', () => {
             parameters: { language: language.toLowerCase() },
             scope,
             filesForAnalysis,
+            filesWithDiffs: [],
           },
         },
         {
@@ -462,6 +463,7 @@ describe('api', () => {
             parameters: { language: language.toLowerCase() },
             scope: AnalysisScope.GIT_DIFF,
             filesForAnalysis,
+            filesWithDiffs: [],
           },
         },
         {

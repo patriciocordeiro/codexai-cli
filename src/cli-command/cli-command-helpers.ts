@@ -141,6 +141,34 @@ export async function runAnalysis({
 }
 
 /**
+ * Runs the analysis task with diff information for the project.
+ * This enhanced version includes git diff data for changed files.
+ *
+ * @param {RunAnalysisParams} params - The parameters object.
+ * @param {string} params.task - The analysis task to run.
+ * @param {string[]} params.paths - The file paths to analyze.
+ * @param {{ method?: string; language?: string; all?: boolean; openBrowser?: boolean }} params.options - Options for analysis.
+ * @returns {Promise<void>} Resolves when analysis is complete.
+ */
+export async function runAnalysisWithDiffs({
+  task,
+  paths,
+  options,
+}: RunAnalysisParams): Promise<void> {
+  const { AnalysisOrchestrator } = await import(
+    './analysis/analysis-orchestrator'
+  );
+  const orchestrator = new AnalysisOrchestrator();
+
+  await orchestrator.runAnalysisWithDiffs(task, paths, {
+    method: options.method,
+    language: options.language,
+    all: options.all,
+    openBrowser: options.openBrowser,
+  });
+}
+
+/**
  * Logs the target files for deployment
  * @param {string[]} targetFilePaths - Array of file paths to log
  */

@@ -9,10 +9,15 @@ import {
   GetAnalysisScopeParams,
   TriggerAnalysisAndDisplayResultsParams,
 } from '../../models/analysis-helpers.model';
-import { AnalysisContext, AnalysisScopeResult } from '../../models/cli.model';
+import {
+  AnalysisContext,
+  AnalysisScope,
+  AnalysisScopeResult,
+} from '../../models/cli.model';
 import { openBrowser } from '../cli/cli-helpers';
 import { loadProjectConfig } from '../config/config-helpers';
 import { deployChangesIfNeeded } from '../deploy/deploy-helpers';
+import { FileWithDiff, getFilesWithDiffsForAnalysis } from '../git/git-helpers';
 import {
   determineAnalysisScope,
   getFilesForScope,
@@ -175,4 +180,118 @@ export function handleAnalysisError(error: unknown): void {
     console.error(chalk.red.bold('\n❌ An unexpected error occurred:'), error);
   }
   process.exit(1);
+}
+
+/**
+ * Represents the complete analysis data including files and their diffs
+ */
+export interface AnalysisDataWithDiffs {
+  scope: AnalysisScope;
+  targetFilePaths: string[];
+  filesWithDiffs: FileWithDiff[];
+}
+
+/**
+ * Prepares analysis data including diff information for each file.
+ * Combines scope determination with diff extraction for comprehensive analysis.
+ * @param {GetAnalysisScopeParams} params - The parameters object containing paths and scope.
+ * @returns {Promise<AnalysisDataWithDiffs>} The complete analysis data with files and their diffs.
+ */
+export async function prepareAnalysisDataWithDiffs({
+  paths,
+  scope,
+}: GetAnalysisScopeParams): Promise<AnalysisDataWithDiffs> {
+  // Get the analysis scope and target files
+  const scopeResult = await getAnalysisScope({ paths, scope });
+
+  // Get files with their diff information
+  const allFilesWithDiffs = getFilesWithDiffsForAnalysis();
+
+  // Filter to only include files that are in our target scope
+  const targetFileSet = new Set(scopeResult.targetFilePaths);
+  const filesWithDiffs = allFilesWithDiffs.filter(fileWithDiff =>
+    targetFileSet.has(fileWithDiff.filePath)
+  );
+
+  return {
+    scope: scopeResult.scope as AnalysisScope,
+    targetFilePaths: scopeResult.targetFilePaths,
+    filesWithDiffs,
+  };
+}
+
+/**
+ * Parameters for triggerAnalysisWithDiffs
+ */
+export interface TriggerAnalysisWithDiffsParams {
+  apiKey: string;
+  projectId: string;
+  task: string;
+  language: string;
+  analysisData: AnalysisDataWithDiffs;
+  isOpenBrowser?: boolean;
+}
+
+/**
+ * Triggers analysis with diff information included.
+ * This is an enhanced version that sends both file paths and their diff data.
+ * @param {TriggerAnalysisWithDiffsParams} params - The parameters object.
+ * @returns {Promise<void>}
+ */
+export async function triggerAnalysisWithDiffs({
+  apiKey,
+  projectId,
+  task,
+  language,
+  analysisData,
+  isOpenBrowser = false,
+}: TriggerAnalysisWithDiffsParams): Promise<void> {
+  const spinner = ora('Sending analysis request with diff data...').start();
+
+  try {
+    const { resultsUrl } = await triggerAnalysis({
+      apiKey,
+      projectId,
+      taskType: task,
+      language,
+      scope: analysisData.scope,
+      filesForAnalysis: analysisData.targetFilePaths,
+      filesWithDiffs: analysisData.filesWithDiffs,
+    });
+
+    spinner.succeed('Analysis with diffs successfully initiated!');
+    console.info('\n✅ View analysis progress and results at:');
+    console.info(chalk.blue.underline(resultsUrl));
+
+    if (!IS_PRODUCTION && isOpenBrowser) {
+      openBrowser(resultsUrl);
+    }
+  } catch (error) {
+    const isCI = Boolean(process.env.CI) || !process.stdin.isTTY;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Check if this is a server unreachability issue
+    if (
+      errorMsg.includes('Server unreachable') ||
+      errorMsg.includes('ECONNREFUSED') ||
+      errorMsg.includes('ENOTFOUND') ||
+      errorMsg.includes('Network Error')
+    ) {
+      spinner.fail('Server unreachable during analysis request');
+      console.error('🌐 Unable to reach CodeAI server for analysis');
+
+      if (isCI && process.env.CODEAI_FAIL_ON_UNREACHABLE !== 'true') {
+        console.warn(
+          '⚠️  CI mode: exiting gracefully despite server unreachability'
+        );
+        console.info(
+          '💡 Set CODEAI_FAIL_ON_UNREACHABLE=true to make CI fail instead'
+        );
+        process.exit(0);
+      }
+    }
+
+    spinner.fail('Analysis request failed');
+    throw error;
+  }
 }

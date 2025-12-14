@@ -169,3 +169,191 @@ export function getChangedFiles(): string[] {
     return [];
   }
 }
+
+export type DiffLine = {
+  lineNumber: number | null; // null para linhas removidas
+  type: '+' | '-' | ' ';
+  text: string;
+};
+
+export type Hunk = {
+  filename: string;
+  hunkLines: DiffLine[];
+};
+
+/**
+ * Represents a file along with its git diff information
+ */
+export interface FileWithDiff {
+  filePath: string;
+  hunks: Hunk[];
+}
+
+// Function to parse git diff output into structured hunks
+/**
+ *
+ * @param diff
+ */
+export function parseDiff(diff: string): Hunk[] {
+  const hunks: Hunk[] = [];
+
+  // Split into file diffs by the unified git diff file separator
+  const diffFiles = diff.split(/^diff --git /gm).slice(1);
+
+  for (const fileDiff of diffFiles) {
+    const fileHeader = fileDiff.match(/^a\/(.+?) b\/(.+?)\n/);
+    if (!fileHeader) continue;
+    const filename = fileHeader[2];
+
+    // Match all hunk headers using matchAll for safer iteration
+    const hunkHeaderRegex = /@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/g;
+    const headers = Array.from(fileDiff.matchAll(hunkHeaderRegex));
+
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i];
+      const newStart = Number.parseInt(header[1], 10);
+      const hunkStart = header.index + header[0].length;
+      const nextHeader = headers[i + 1];
+      const hunkEnd = nextHeader ? nextHeader.index : fileDiff.length;
+      const hunkText = fileDiff
+        .slice(hunkStart, hunkEnd)
+        .replace(/\r/g, '')
+        .replace(/^\n/, '')
+        .replace(/\n$/, '');
+
+      let currentNewLine = newStart;
+      const hunkLines: DiffLine[] = [];
+
+      if (hunkText.length === 0) {
+        // Empty hunk
+        hunks.push({ filename, hunkLines });
+        continue;
+      }
+
+      const lines = hunkText.split('\n');
+      for (const line of lines) {
+        if (line.length === 0) continue;
+        const firstChar = line[0];
+        const content = line.slice(1);
+        if (firstChar === '+') {
+          hunkLines.push({
+            lineNumber: currentNewLine,
+            type: '+',
+            text: content,
+          });
+          currentNewLine++;
+        } else if (firstChar === '-') {
+          hunkLines.push({ lineNumber: null, type: '-', text: content });
+        } else if (firstChar === ' ') {
+          hunkLines.push({
+            lineNumber: currentNewLine,
+            type: ' ',
+            text: content,
+          });
+          currentNewLine++;
+        } else {
+          // Ignore metadata lines or context without leading markers
+        }
+      }
+
+      hunks.push({ filename, hunkLines });
+    }
+  }
+
+  return hunks;
+}
+
+/**
+ * Function to get and parse git diff of last commit
+ * Gets and parses the git diff of the last commit.
+ * @returns {Promise<Hunk[] | undefined>} A promise that resolves to an array of hunks representing the diff, or undefined if no changes detected.
+ */
+export async function getAndParseGitDiffOfLastCommit(): Promise<
+  Hunk[] | undefined
+> {
+  // 1️⃣ pegar diff
+  const diff = execSync('git diff --unified=3 HEAD~1 HEAD').toString();
+  if (!diff.trim()) {
+    console.log('Nenhuma alteração detectada.');
+    return;
+  }
+
+  // save to a json file for inspection
+
+  fse.writeFileSync('diff.json', JSON.stringify(parseDiff(diff), null, 2));
+
+  // 2️⃣ processar diff
+  const hunks = parseDiff(diff);
+  return hunks;
+}
+
+/**
+ * Gets changed files along with their diff information for analysis.
+ * Combines file paths with parsed diff hunks for each file.
+ * @returns {FileWithDiff[]} Array of files with their respective diff information
+ */
+export function getFilesWithDiffsForAnalysis(): FileWithDiff[] {
+  try {
+    // 1. Get list of changed files
+    const changedFiles = getChangedFiles();
+
+    if (changedFiles.length === 0) {
+      return [];
+    }
+
+    // 2. Get full diff for all changes
+    let diffOutput = '';
+    try {
+      // Get staged changes
+      const stagedDiff = execSync('git diff --cached --unified=3', {
+        encoding: 'utf-8',
+      });
+      diffOutput += stagedDiff;
+
+      // Get unstaged changes
+      const unstagedDiff = execSync('git diff --unified=3', {
+        encoding: 'utf-8',
+      });
+      diffOutput += unstagedDiff;
+    } catch (err) {
+      console.error('Failed to get git diff:', err);
+      return changedFiles.map(filePath => ({
+        filePath,
+        hunks: [],
+      }));
+    }
+
+    if (!diffOutput.trim()) {
+      // No diff available (e.g., only untracked files)
+      return changedFiles.map(filePath => ({
+        filePath,
+        hunks: [],
+      }));
+    }
+
+    // 3. Parse the diff into hunks
+    const allHunks = parseDiff(diffOutput);
+
+    // 4. Group hunks by filename
+    const hunksByFile = new Map<string, Hunk[]>();
+    for (const hunk of allHunks) {
+      const existing = hunksByFile.get(hunk.filename) || [];
+      existing.push(hunk);
+      hunksByFile.set(hunk.filename, existing);
+    }
+
+    // 5. Create FileWithDiff objects for each changed file
+    const filesWithDiffs: FileWithDiff[] = changedFiles.map(filePath => {
+      const hunks = hunksByFile.get(filePath) || [];
+      return {
+        filePath,
+        hunks,
+      };
+    });
+
+    return filesWithDiffs;
+  } catch (err) {
+    console.error('Failed to get files with diffs:', err);
+    return [];
+  }
+}

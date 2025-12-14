@@ -40,6 +40,7 @@ import {
   ProgramCreateProjectParams,
   RunAnalysisParams,
 } from '../models/command-helpers.model';
+import { AnalysisOrchestrator } from './analysis/analysis-orchestrator';
 import {
   programCreateProject,
   programDeploy,
@@ -244,7 +245,9 @@ describe('command-helpers', () => {
 
   describe('runAnalysis', () => {
     // Mock the AnalysisOrchestrator dynamically imported module
-    const mockRunAnalysis = jest.fn() as jest.MockedFunction<any>;
+    const mockRunAnalysis = jest.fn() as jest.MockedFunction<
+      AnalysisOrchestrator['runAnalysis']
+    >;
 
     beforeEach(() => {
       jest.clearAllMocks();

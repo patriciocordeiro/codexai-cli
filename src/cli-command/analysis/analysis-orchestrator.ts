@@ -3,7 +3,9 @@ import {
   deployOutOfSyncFiles,
   displayNoFilesToAnalyze,
   handleAnalysisError,
+  prepareAnalysisDataWithDiffs,
   triggerAnalysisAndDisplayResults,
+  triggerAnalysisWithDiffs,
 } from '../../helpers/analysis/analysis-helpers';
 import { isGitRepository } from '../../helpers/git/git-helpers';
 import { promptForAnalysisTask } from '../../helpers/prompts/prompt-helpers';
@@ -41,9 +43,9 @@ export class AnalysisOrchestrator {
 
   /**
    * Orchestrates the complete analysis flow
-   * @param task
-   * @param paths
-   * @param options
+   * @param {string} task - The analysis task to execute
+   * @param {string[]} paths - The file paths to analyze
+   * @param {AnalysisCommandOptions} options - Analysis command options
    */
   async runAnalysis(
     task: string,
@@ -90,23 +92,20 @@ export class AnalysisOrchestrator {
   }
 
   /**
-   * Validates task is provided in non-interactive environments
-   * @param task
+   *
+   * @param {string} task
+   * @returns {void}
    */
   private validateTaskInNonInteractive(task: string): void {
     if (!task && this.isNonInteractive) {
-      console.error(
-        chalk.red.bold(
-          '\n❌ Analysis task not provided and CLI is running in non-interactive mode. Please specify a task (e.g., REVIEW) with `--task` or as a positional argument.'
-        )
-      );
-      process.exit(1);
+      this.handleNonInteractiveTaskError();
     }
   }
 
   /**
-   * Selects analysis task (prompts if not provided in interactive mode)
-   * @param task
+   * Selects or prompts for an analysis task
+   * @param {string} task - The analysis task to execute
+   * @returns {Promise<string>} The selected task
    */
   private async selectTask(task: string): Promise<string> {
     if (task) {
@@ -114,21 +113,31 @@ export class AnalysisOrchestrator {
     }
 
     if (this.isNonInteractive) {
-      console.error(
-        chalk.red.bold(
-          '\n❌ Analysis task not provided and CLI is running in non-interactive mode. Please specify a task (e.g., REVIEW) with `--task` or as a positional argument.'
-        )
-      );
-      process.exit(1);
+      this.handleNonInteractiveTaskError();
     }
 
     return await promptForAnalysisTask();
   }
 
   /**
+   * Handles error when no task is provided in non-interactive mode
+   * @returns {void}
+   * @throws Exits the process after displaying an error message
+   */
+  private handleNonInteractiveTaskError(): void {
+    console.error(
+      chalk.red.bold(
+        '\n❌ Analysis task not provided and CLI is running in non-interactive mode. Please specify a task (e.g., REVIEW) with `--task` or as a positional argument.'
+      )
+    );
+    process.exit(1);
+  }
+
+  /**
    * Prepares analysis by determining strategy and getting target files
-   * @param paths
-   * @param options
+   * @param {string[]} paths - The file paths to analyze
+   * @param {AnalysisCommandOptions} options - Analysis command options
+   * @returns {Promise<AnalysisPreparationResult>} Preparation result with strategy, target files, and scope
    */
   private async prepareAnalysis(
     paths: string[],
@@ -154,8 +163,18 @@ export class AnalysisOrchestrator {
   }
 
   /**
-   * Executes the analysis and displays results
-   * @param params
+   * Logs analysis execution parameters
+   * @param {AnalysisExecutionParams} params
+   */
+  private logAnalysisExecutionParams(params: AnalysisExecutionParams): void {
+    console.info(chalk.blue.bold(`Task: ${params.task}`));
+    console.info(chalk.blue.bold(`Language: ${params.language}`));
+  }
+
+  /**
+   * Executes the analysis
+   * @param {AnalysisExecutionParams} params - The execution parameters
+   * @returns {Promise<void>}
    */
   private async executeAnalysis(
     params: AnalysisExecutionParams
@@ -164,8 +183,7 @@ export class AnalysisOrchestrator {
       chalk.blue.bold(`\n🔍 Running analysis with scope: ${params.scope}`)
     );
     this.logTargetFiles(params.targetFilePaths);
-    console.info(chalk.blue.bold(`Task: ${params.task}`));
-    console.info(chalk.blue.bold(`Language: ${params.language}`));
+    this.logAnalysisExecutionParams(params);
 
     await triggerAnalysisAndDisplayResults({
       apiKey: params.apiKey,
@@ -180,11 +198,99 @@ export class AnalysisOrchestrator {
 
   /**
    * Logs the target files for analysis
-   * @param targetFilePaths
+   * @param {string[]} targetFilePaths - The paths of files to be analyzed
    */
   private logTargetFiles(targetFilePaths: string[]): void {
     console.info(
       chalk.blue.bold(`Target files:\n${targetFilePaths.join('\n')}\n'----'`)
     );
+  }
+
+  /**
+   * Executes analysis with diff information included
+   * @param {AnalysisExecutionParams} params - The execution parameters
+   */
+  private async executeAnalysisWithDiffs(
+    params: AnalysisExecutionParams
+  ): Promise<void> {
+    console.info(
+      chalk.blue.bold(
+        `\n🔍 Running analysis with diffs - scope: ${params.scope}`
+      )
+    );
+    this.logTargetFiles(params.targetFilePaths);
+    this.logAnalysisExecutionParams(params);
+
+    // Prepare analysis data with diff information
+    const analysisData = await prepareAnalysisDataWithDiffs({
+      paths: params.targetFilePaths,
+      scope: params.scope,
+    });
+
+    console.info(
+      chalk.green(
+        `\n📊 Diff data collected for ${analysisData.filesWithDiffs.length} files`
+      )
+    );
+
+    await triggerAnalysisWithDiffs({
+      apiKey: params.apiKey,
+      projectId: params.projectId,
+      task: params.task,
+      language: params.language,
+      analysisData,
+      isOpenBrowser: params.isOpenBrowser,
+    });
+  }
+
+  /**
+   * Orchestrates the complete analysis flow with diff information
+   * This is an enhanced version that includes git diff data
+   * @param {string} task - The analysis task to execute
+   * @param {string[]} paths - The file paths to analyze
+   * @param {AnalysisCommandOptions} options - Analysis command options
+   */
+  async runAnalysisWithDiffs(
+    task: string,
+    paths: string[],
+    options: AnalysisCommandOptions
+  ): Promise<void> {
+    try {
+      // 1. Validate task in non-interactive environments
+      this.validateTaskInNonInteractive(task);
+
+      // 2. Ensure authentication and project setup
+      const authContext = await this.authHandler.ensureAuthContext();
+
+      // 3. Handle task selection
+      const selectedTask = await this.selectTask(task);
+
+      // 4. Prepare analysis (determine strategy and get target files)
+      const preparation = await this.prepareAnalysis(paths, options);
+
+      // 5. Validate we have files to analyze
+      if (preparation.targetFiles.length === 0) {
+        displayNoFilesToAnalyze();
+        return;
+      }
+
+      // 6. Deploy any out-of-sync files
+      await deployOutOfSyncFiles({
+        apiKey: authContext.apiKey,
+        projectId: authContext.projectId,
+      });
+
+      // 7. Execute the analysis with diffs
+      await this.executeAnalysisWithDiffs({
+        ...authContext,
+        task: selectedTask,
+        language: options.language || 'en',
+        scope: preparation.scope,
+        targetFilePaths: preparation.targetFiles,
+        isOpenBrowser: options.openBrowser || false,
+      });
+    } catch (error) {
+      handleAnalysisError(error);
+    }
   }
 }

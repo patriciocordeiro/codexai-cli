@@ -1,5 +1,6 @@
 // Interfaces for API functions in src/api/api.ts
 
+import { FileWithDiff } from '../helpers/git/git-helpers';
 import { AnalysisScope } from '../models/cli.model';
 
 /**
@@ -30,6 +31,7 @@ export interface TriggerAnalysisInput {
   language: string;
   scope?: AnalysisScope;
   filesForAnalysis: string[];
+  filesWithDiffs?: FileWithDiff[];
 }
 
 /**

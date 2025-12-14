@@ -22,6 +22,7 @@ import { AnalysisScope, AnalysisScopeResult } from '../../models/cli.model';
 import { openBrowser } from '../cli/cli-helpers';
 import { loadProjectConfig } from '../config/config-helpers';
 import { deployChangesIfNeeded } from '../deploy/deploy-helpers';
+import { getFilesWithDiffsForAnalysis } from '../git/git-helpers';
 import {
   determineAnalysisScope,
   getFilesForScope,
@@ -33,8 +34,10 @@ import {
   getAnalysisScope,
   handleAnalysisError,
   handleNonGitRepository,
+  prepareAnalysisDataWithDiffs,
   setupAnalysisContext,
   triggerAnalysisAndDisplayResults,
+  triggerAnalysisWithDiffs,
 } from './analysis-helpers';
 
 // Import the mocked ora
@@ -54,6 +57,10 @@ jest.mock('../scope/scope-helpers', () => ({
   determineAnalysisScope: jest.fn(),
   getFilesForScope: jest.fn(),
   validatePathsInScope: jest.fn(),
+}));
+
+jest.mock('../git/git-helpers', () => ({
+  getFilesWithDiffsForAnalysis: jest.fn(),
 }));
 
 jest.mock('../deploy/deploy-helpers', () => ({
@@ -448,6 +455,165 @@ describe('analysis-helpers', () => {
       expect(chalk.cyan).toHaveBeenCalled();
       expect(chalk.gray).toHaveBeenCalled();
       expect(chalk.dim).toHaveBeenCalled();
+    });
+  });
+
+  describe('prepareAnalysisDataWithDiffs', () => {
+    it('should prepare analysis data with diffs for changed files', async () => {
+      // Mock determineAnalysisScope to return target files
+      const mockDetermineAnalysisScope =
+        determineAnalysisScope as jest.MockedFunction<
+          typeof determineAnalysisScope
+        >;
+      mockDetermineAnalysisScope.mockResolvedValue({
+        scope: AnalysisScope.GIT_DIFF,
+        targetFilePaths: ['src/file1.ts', 'src/file2.ts'],
+      });
+
+      // Mock getFilesWithDiffsForAnalysis
+      const mockGetFilesWithDiffs =
+        getFilesWithDiffsForAnalysis as jest.MockedFunction<
+          typeof getFilesWithDiffsForAnalysis
+        >;
+      mockGetFilesWithDiffs.mockReturnValue([
+        {
+          filePath: 'src/file1.ts',
+          hunks: [
+            {
+              filename: 'src/file1.ts',
+              hunkLines: [{ lineNumber: 1, type: '+', text: 'new line' }],
+            },
+          ],
+        },
+        {
+          filePath: 'src/file2.ts',
+          hunks: [
+            {
+              filename: 'src/file2.ts',
+              hunkLines: [{ lineNumber: 5, type: '-', text: 'removed line' }],
+            },
+          ],
+        },
+        {
+          filePath: 'src/file3.ts', // This file is not in target
+          hunks: [],
+        },
+      ]);
+
+      const result = await prepareAnalysisDataWithDiffs({
+        paths: [],
+        scope: AnalysisScope.GIT_DIFF,
+      });
+
+      expect(result.scope).toBe(AnalysisScope.GIT_DIFF);
+      expect(result.targetFilePaths).toEqual(['src/file1.ts', 'src/file2.ts']);
+      expect(result.filesWithDiffs).toHaveLength(2);
+      expect(result.filesWithDiffs[0].filePath).toBe('src/file1.ts');
+      expect(result.filesWithDiffs[1].filePath).toBe('src/file2.ts');
+      expect(result.filesWithDiffs[0].hunks).toHaveLength(1);
+      expect(result.filesWithDiffs[1].hunks).toHaveLength(1);
+    });
+
+    it('should return empty filesWithDiffs when no diffs available', async () => {
+      const mockDetermineAnalysisScope =
+        determineAnalysisScope as jest.MockedFunction<
+          typeof determineAnalysisScope
+        >;
+      mockDetermineAnalysisScope.mockResolvedValue({
+        scope: AnalysisScope.ENTIRE_PROJECT,
+        targetFilePaths: ['src/file1.ts'],
+      });
+
+      const mockGetFilesWithDiffs =
+        getFilesWithDiffsForAnalysis as jest.MockedFunction<
+          typeof getFilesWithDiffsForAnalysis
+        >;
+      mockGetFilesWithDiffs.mockReturnValue([]);
+
+      const result = await prepareAnalysisDataWithDiffs({
+        paths: ['src/'],
+        scope: AnalysisScope.ENTIRE_PROJECT,
+      });
+
+      expect(result.filesWithDiffs).toEqual([]);
+    });
+  });
+
+  describe('triggerAnalysisWithDiffs', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should trigger analysis with diff data successfully', async () => {
+      const mockTriggerAnalysis = triggerAnalysis as jest.MockedFunction<
+        typeof triggerAnalysis
+      >;
+      mockTriggerAnalysis.mockResolvedValue({
+        resultsUrl: 'https://example.com/results/123',
+        analysisRunId: 'run-123',
+      });
+
+      const analysisData = {
+        scope: AnalysisScope.GIT_DIFF,
+        targetFilePaths: ['src/file1.ts'],
+        filesWithDiffs: [
+          {
+            filePath: 'src/file1.ts',
+            hunks: [
+              {
+                filename: 'src/file1.ts',
+                hunkLines: [{ lineNumber: 1, type: '+' as const, text: 'new' }],
+              },
+            ],
+          },
+        ],
+      };
+
+      await triggerAnalysisWithDiffs({
+        apiKey: 'test-key',
+        projectId: 'proj-123',
+        task: 'REVIEW',
+        language: 'en',
+        analysisData,
+        isOpenBrowser: false,
+      });
+
+      expect(mockTriggerAnalysis).toHaveBeenCalledWith({
+        apiKey: 'test-key',
+        projectId: 'proj-123',
+        taskType: 'REVIEW',
+        language: 'en',
+        scope: AnalysisScope.GIT_DIFF,
+        filesForAnalysis: ['src/file1.ts'],
+        filesWithDiffs: analysisData.filesWithDiffs,
+      });
+      expect(mockSpinner.start).toHaveBeenCalled();
+      expect(mockSpinner.succeed).toHaveBeenCalled();
+    });
+
+    it('should handle analysis errors', async () => {
+      const mockTriggerAnalysis = triggerAnalysis as jest.MockedFunction<
+        typeof triggerAnalysis
+      >;
+      mockTriggerAnalysis.mockRejectedValue(new Error('API Error'));
+
+      const analysisData = {
+        scope: AnalysisScope.GIT_DIFF,
+        targetFilePaths: [],
+        filesWithDiffs: [],
+      };
+
+      await expect(
+        triggerAnalysisWithDiffs({
+          apiKey: 'test-key',
+          projectId: 'proj-123',
+          task: 'REVIEW',
+          language: 'en',
+          analysisData,
+        })
+      ).rejects.toThrow('API Error');
+
+      expect(mockSpinner.fail).toHaveBeenCalledWith('Analysis request failed');
     });
   });
 });

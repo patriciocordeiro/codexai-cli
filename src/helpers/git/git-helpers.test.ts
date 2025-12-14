@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
   getChangedFiles,
+  getFilesWithDiffsForAnalysis,
   isGitRepository,
   validateGitRepository,
 } from './git-helpers';
@@ -266,5 +267,197 @@ describe('validateGitRepository', () => {
 
     // Restore original cwd
     process.cwd = originalCwd;
+  });
+});
+
+describe('getFilesWithDiffsForAnalysis', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return files with their diff hunks', () => {
+    // Mock getChangedFiles to return some files
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd === 'git diff --cached --name-only') {
+        return 'src/file1.ts\n';
+      }
+      if (cmd === 'git diff --name-only') {
+        return 'src/file2.ts\n';
+      }
+      if (cmd === 'git ls-files --others --exclude-standard') {
+        return '';
+      }
+      if (cmd === 'git diff --cached --unified=3') {
+        return `diff --git a/src/file1.ts b/src/file1.ts
+index 1234567..abcdefg 100644
+--- a/src/file1.ts
++++ b/src/file1.ts
+@@ -1,3 +1,4 @@
+ export function hello() {
++  console.log('world');
+   return 'hello';
+ }
+`;
+      }
+      if (cmd === 'git diff --unified=3') {
+        return `diff --git a/src/file2.ts b/src/file2.ts
+index 9876543..fedcba9 100644
+--- a/src/file2.ts
++++ b/src/file2.ts
+@@ -5,6 +5,7 @@
+ export function goodbye() {
++  console.log('farewell');
+   return 'goodbye';
+ }
+`;
+      }
+      return '';
+    });
+
+    const result = getFilesWithDiffsForAnalysis();
+
+    expect(result).toHaveLength(2);
+    expect(result[0].filePath).toBe('src/file1.ts');
+    expect(result[1].filePath).toBe('src/file2.ts');
+    expect(result[0].hunks).toHaveLength(1);
+    expect(result[1].hunks).toHaveLength(1);
+    expect(result[0].hunks[0].filename).toBe('src/file1.ts');
+    expect(result[1].hunks[0].filename).toBe('src/file2.ts');
+  });
+
+  it('should return empty array when no files changed', () => {
+    execSync.mockImplementation((cmd: string) => {
+      if (
+        cmd === 'git diff --cached --name-only' ||
+        cmd === 'git diff --name-only' ||
+        cmd === 'git ls-files --others --exclude-standard'
+      ) {
+        return '';
+      }
+      // Fallback commands
+      if (cmd.startsWith('git rev-parse --verify')) {
+        throw new Error('no branch');
+      }
+      if (cmd === 'git diff HEAD~1 --name-only') {
+        return '';
+      }
+      return '';
+    });
+
+    const result = getFilesWithDiffsForAnalysis();
+
+    expect(result).toEqual([]);
+  });
+
+  it('should handle files with empty hunks when diff is unavailable', () => {
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd === 'git diff --name-only') {
+        return 'newfile.ts\n';
+      }
+      if (
+        cmd === 'git diff --cached --unified=3' ||
+        cmd === 'git diff --unified=3'
+      ) {
+        return ''; // No diff for untracked files
+      }
+      if (
+        cmd === 'git diff --cached --name-only' ||
+        cmd === 'git ls-files --others --exclude-standard'
+      ) {
+        return '';
+      }
+      return '';
+    });
+
+    const result = getFilesWithDiffsForAnalysis();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].filePath).toBe('newfile.ts');
+    expect(result[0].hunks).toEqual([]);
+  });
+
+  it('should handle errors gracefully and return empty array', () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    // Mock to have changed files but fail on diff
+    execSync.mockImplementation((cmd: string) => {
+      // Return a changed file
+      if (cmd === 'git diff --name-only') {
+        return 'src/file.ts\n';
+      }
+
+      // Fail on diff commands
+      if (
+        cmd === 'git diff --cached --unified=3' ||
+        cmd === 'git diff --unified=3'
+      ) {
+        throw new Error('git diff command failed');
+      }
+
+      // Handle other commands
+      if (
+        cmd === 'git diff --cached --name-only' ||
+        cmd === 'git ls-files --others --exclude-standard'
+      ) {
+        return '';
+      }
+
+      return '';
+    });
+
+    const result = getFilesWithDiffsForAnalysis();
+
+    // Should return file with empty hunks
+    expect(result).toHaveLength(1);
+    expect(result[0].filePath).toBe('src/file.ts');
+    expect(result[0].hunks).toEqual([]);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should group multiple hunks from same file', () => {
+    execSync.mockImplementation((cmd: string) => {
+      if (cmd === 'git diff --name-only') {
+        return 'src/multi.ts\n';
+      }
+      if (
+        cmd === 'git diff --cached --name-only' ||
+        cmd === 'git ls-files --others --exclude-standard'
+      ) {
+        return '';
+      }
+      if (cmd === 'git diff --cached --unified=3') {
+        return '';
+      }
+      if (cmd === 'git diff --unified=3') {
+        return `diff --git a/src/multi.ts b/src/multi.ts
+index 1111111..2222222 100644
+--- a/src/multi.ts
++++ b/src/multi.ts
+@@ -1,3 +1,4 @@
+ function first() {
++  console.log('first');
+   return 1;
+ }
+@@ -10,5 +11,6 @@
+ function second() {
++  console.log('second');
+   return 2;
+ }
+`;
+      }
+      return '';
+    });
+
+    const result = getFilesWithDiffsForAnalysis();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].filePath).toBe('src/multi.ts');
+    expect(result[0].hunks).toHaveLength(2);
+    expect(result[0].hunks[0].filename).toBe('src/multi.ts');
+    expect(result[0].hunks[1].filename).toBe('src/multi.ts');
   });
 });

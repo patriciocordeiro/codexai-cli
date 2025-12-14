@@ -14,7 +14,7 @@ import { HTTP_TIMEOUT, IS_PRODUCTION } from './constants/constants';
 import {
   programCreateProject,
   programDeploy,
-  runAnalysis,
+  runAnalysisWithDiffs,
 } from './cli-command/cli-command-helpers';
 
 /**
@@ -153,10 +153,6 @@ addTokenOption(
       'Analysis method: "git-diff", "entire-project", or "selected-files". If not provided, defaults to git-diff for git repositories or prompts for selection.'
     )
     .option(
-      '--paths <paths...>',
-      'Optional: Specific files or folders to analyze. If omitted, uses the target directory from .codeai.json.'
-    )
-    .option(
       '-t, --task <task>',
       'Specify analysis task (e.g., REVIEW, SECURITY). Useful for CI/pipelines where positional args are inconvenient.'
     )
@@ -178,7 +174,7 @@ addTokenOption(
 
   const finalTask = options.task || task;
   const finalPaths: string[] = Array.isArray(paths) ? paths : [];
-  await runAnalysis({ task: finalTask, paths: finalPaths, options });
+  await runAnalysisWithDiffs({ task: finalTask, paths: finalPaths, options });
 });
 
 // Only run the CLI if this file is being executed directly, not when imported for testing

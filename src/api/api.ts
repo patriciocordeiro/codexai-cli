@@ -1,6 +1,7 @@
 // In src/api.ts
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/constants';
+import { FileWithDiff } from '../helpers/git/git-helpers';
 import { AnalysisScope } from '../models/cli.model';
 import { handleApiError } from './api-error-handler';
 import {
@@ -15,6 +16,15 @@ import {
   UpdateProjectFilesInput,
   UpdateProjectFilesOutput,
 } from './api.model';
+
+interface TriggerAnalysisRequestData {
+  projectId: string;
+  task: string;
+  parameters: { language: string };
+  scope: AnalysisScope;
+  filesForAnalysis: string[];
+  filesWithDiffs?: FileWithDiff[];
+}
 
 /**
  * Creates a new project on the backend with the provided files.
@@ -62,6 +72,7 @@ export async function createProjectWithFiles({
  * @param {string} params.language - The desired language for the results.
  * @param {AnalysisScope} [params.scope] - The scope of the analysis (default: GIT_DIFF).
  * @param {string[]} params.filesForAnalysis - The files to analyze.
+ * @param {FileWithDiff[]} [params.filesWithDiffs] - Optional diff data for each file.
  * @returns {Promise<TriggerAnalysisOutput>} The analysis run details, including the resultsUrl and analysisRunId.
  */
 export async function triggerAnalysis({
@@ -71,20 +82,31 @@ export async function triggerAnalysis({
   language,
   scope = AnalysisScope.GIT_DIFF,
   filesForAnalysis,
+  filesWithDiffs,
 }: TriggerAnalysisInput): Promise<TriggerAnalysisOutput> {
   try {
     const endpointUrl = `${API_BASE_URL}/triggerAnalysisForCliFunction`;
+
+    const requestData: TriggerAnalysisRequestData = {
+      projectId: projectId,
+      task: taskType.toUpperCase(),
+      parameters: { language: language.toLowerCase() },
+      scope: scope,
+      filesForAnalysis: filesForAnalysis,
+      filesWithDiffs: filesWithDiffs ?? [],
+    };
+
+    // Include diff data if available
+    if (filesWithDiffs && filesWithDiffs.length > 0) {
+      requestData.filesWithDiffs = filesWithDiffs;
+      console.log(
+        `📊 Sending diff data for ${filesWithDiffs.length} files to backend`
+      );
+    }
+
     const response = await axios.post(
       endpointUrl,
-      {
-        data: {
-          projectId: projectId,
-          task: taskType.toUpperCase(),
-          parameters: { language: language.toLowerCase() },
-          scope: scope,
-          filesForAnalysis: filesForAnalysis,
-        },
-      },
+      { data: requestData },
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
